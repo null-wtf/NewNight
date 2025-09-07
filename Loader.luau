@@ -119,7 +119,7 @@ local function DownloadDirectory(DirectoryLink: string, SavePath: string): boole
                                     end
                                 else
                                     if (isfile and not isfile("NewNight/"..SavePath.."/"..v.name)) or not isfile then
-                                        print(DownloadAsset("/raw/refs/heads/main/"..v.path, "NewNight/"..SavePath.."/"..v.name))
+                                        DownloadAsset("/raw/refs/heads/main/"..v.path, "NewNight/"..SavePath.."/"..v.name)
                                     end
                                 end
                             end
