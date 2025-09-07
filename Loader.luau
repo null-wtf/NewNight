@@ -136,9 +136,11 @@ local function DownloadDirectory(DirectoryLink: string, SavePath: string): boole
 end
 
 DownloadDirectory("/tree/main/Assets", "Assets")
--- if Night.Dev then
+if Night.Dev then
     loadstring(readfile("NewNight/Library/Main.luau"))()
--- end
+else
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/null-wtf/NewNight/refs/heads/main/Library/Main.luau"))()
+end
 
 if not Night.Assets or Night.Assets and (not Night.Assets.Connections or not Night.Assets.Functions) then
     warn("Failed to load assets")
