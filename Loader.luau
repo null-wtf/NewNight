@@ -136,9 +136,9 @@ local function DownloadDirectory(DirectoryLink: string, SavePath: string): boole
 end
 
 DownloadDirectory("/tree/main/Assets", "Assets")
-if Night.Dev then
+-- if Night.Dev then
     loadstring(readfile("NewNight/Library/Main.luau"))()
-end
+-- end
 
 if not Night.Assets or Night.Assets and (not Night.Assets.Connections or not Night.Assets.Functions) then
     warn("Failed to load assets")
@@ -151,8 +151,8 @@ end
 Night.Assets.Functions.DownloadDirectory = DownloadDirectory
 Night.Assets.Functions.DownloadAsset = DownloadAsset
 
-Night:LoadFile("Universal", "")
-Night:LoadFile(Night.Game, "")
+Night:LoadFile("Universal")
+Night:LoadFile(Night.Game)
 
 if queue_on_teleport then
     Night.Assets.Connections:Add(LocalPlayer.OnTeleport:Connect(function(State: Enum.TeleportState)
@@ -196,9 +196,14 @@ if isfile then
     end
 
     if Updated then
+        local Keybind = Night.Keybind
+        if typeof(Keybind) == "EnumItem" then
+            Keybind = Keybind.Name
+        end
+
         task.delay(0.2, Night.CreateNotification, Night, {
             Title = "Updated to V"..Night.Version,
-            Description = string.format("Press %s to toggle the GUI", Night.Keybind),
+            Description = string.format("Press %s to toggle the GUI", Keybind),
             Duration = 5
         })
     end
