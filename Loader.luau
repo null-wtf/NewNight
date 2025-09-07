@@ -98,7 +98,6 @@ local function DownloadDirectory(DirectoryLink: string, SavePath: string): boole
             }
         })
 
-        setclipboard(BaseGit..DirectoryLink)
         if Suc and DirData then
             local Body: string? = DirData.Body
             if (DirData.Success or DirData.StatusCode == 200) and Body then
@@ -119,7 +118,7 @@ local function DownloadDirectory(DirectoryLink: string, SavePath: string): boole
                                     end
                                 else
                                     if (isfile and not isfile("NewNight/"..SavePath.."/"..v.name)) or not isfile then
-                                        DownloadAsset("/raw/refs/heads/main/"..v.path, "NewNight/"..SavePath.."/"..v.name)
+                                        print(DownloadAsset("/raw/refs/heads/main/"..v.path, "NewNight/"..SavePath.."/"..v.name))
                                     end
                                 end
                             end
