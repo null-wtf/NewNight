@@ -370,7 +370,7 @@ local function GetNearestTeamUpgradeShop()
         Distance = math.huge
     }
 
-    for i,v: Part in CollectionService:GetTagged("TeamUpgradeShopKeeper") do
+    for i,v: Part in CollectionService:GetTagged("TeamUpgradeShopkeeper") do
         local Id: string = v:GetAttribute("Id")
         if Id and Night:IsAlive(LocalPlayer) then
             local Distance: number = Night:GetDistanceFrom(LocalPlayer.Character.PrimaryPart.Position, v.Position)
