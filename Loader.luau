@@ -173,8 +173,7 @@ if queue_on_teleport then
                 if NightInit.Dev and isfile("NewNight/Loader.luau") then
                     loadstring(readfile("NewNight/Loader.luau"))()
                 else
-                    -- github
-                    print("github")
+                    loadstring(game:HttpGet("https://raw.githubusercontent.com/null-wtf/NewNight/refs/heads/main/Loader.luau"))()
                 end
             ]])
         end
