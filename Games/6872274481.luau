@@ -123,7 +123,7 @@ local function GetInventory(Player: Player?)
     return GameData.Utils.InventoryUtil.getInventory(Player)
 end
 
-local function GetSword(): {AttackSpeed: number, Damage: number, Item: Instance?}
+local function GetSword(): {AttackSpeed: number, Damage: number, Item: Instance?, Meta: {itemType: string}}
     local Inventory = GetInventory()
     local Sword = {
         Item = nil,
@@ -151,7 +151,8 @@ local function GetSword(): {AttackSpeed: number, Damage: number, Item: Instance?
                                 Item = v.tool,
                                 Damage = SwordData.damage,
                                 AttackSpeed = SwordData.attackSpeed,
-                                InvData = v
+                                InvData = v,
+                                Meta = ItemMeta
                             }
                         end
                     end
@@ -469,28 +470,49 @@ local function GetSpeedMultiplier(): number
     return Multiplier
 end
 
-local function MakeClone(): { Clone: Model, Destroy: () -> () }
+local function MakeClone(): { Clone: BasePart, Destroy: () -> (), PrimaryPart: BasePart }
     if Night:IsAlive(LocalPlayer) then
-        local Clone: Part = Instance.new("Part")
-        Clone.Parent = workspace
-        Clone.Size = Vector3.new(2, 2, 1)
-        Clone.Anchored = true
-        Clone.CanCollide = false
+        local PrimaryPart: BasePart = LocalPlayer.Character.PrimaryPart
 
-        Clone.CFrame = LocalPlayer.Character.PrimaryPart.CFrame
-        CurrentCamera.CameraSubject = Clone
+        local Clone = PrimaryPart:Clone()
+        Clone.CanCollide = false
+        Clone.CFrame = PrimaryPart.CFrame
+        Clone.Parent = LocalPlayer.Character
+
+        LocalPlayer.Character.PrimaryPart = Clone
+        for i, v in LocalPlayer.Character:GetDescendants() do
+            if v:IsA('Weld') or v:IsA('Motor6D') then
+                if v.Part0 == PrimaryPart then 
+                    v.Part0 = Clone 
+                end
+
+                if v.Part1 == PrimaryPart then 
+                    v.Part1 = Clone 
+                end
+            end
+        end
+
         return {
             Clone = Clone,
+            PrimaryPart = PrimaryPart,
             Destroy = function()
-                local Humanoid: Humanoid = LocalPlayer.Character:FindFirstChildWhichIsA("Humanoid")
-                Clone:Destroy()
-                if Humanoid then
-                    CurrentCamera.CameraSubject = Humanoid
+                LocalPlayer.Character.PrimaryPart = PrimaryPart
+                for i, v in LocalPlayer.Character:GetDescendants() do
+                    if v:IsA('Weld') or v:IsA('Motor6D') then
+                        if v.Part0 == Clone then 
+                            v.Part0 = PrimaryPart 
+                        end
+
+                        if v.Part1 == Clone then 
+                            v.Part1 = PrimaryPart 
+                        end
+                    end
                 end
+
+                Clone:Destroy()
             end
         }
     end
-
 
     return false
 end
@@ -1066,6 +1088,7 @@ end)();
             TriggerButton = false,
             Boxes = false,
             Particles = false,
+            InfRange = false,
             SelectedAnimation = "Night",
             BoxColor = Color3.fromRGB(255, 0, 0),
             ParticleColor = Color3.fromRGB(255, 0, 0),
@@ -1076,10 +1099,12 @@ end)();
         Data = {
             OldPlayAnimationViewModel = nil,
             AnimationPlaying = false,
+            PlayerDamaged = false,
             OriginalHandPos = nil,
             TimesRanOnCooldown = 0,
             TriggerHeld = false,
             Params = RaycastParams.new(),
+            LastHit = 0,
             Effects = {
                 Boxes = {},
                 Particles = {}
@@ -1130,7 +1155,7 @@ end)();
         local Dir: Vector3 = Target - Player
         local Dist: number = Dir.Magnitude
 
-        if Dist <= 14.5 or Range <= 14.5 then
+        if Dist <= 11.5 or Range <= 11.5 then
             return Player
         end
 
@@ -1164,32 +1189,42 @@ end)();
                     end)
                 end)()
 
-                repeat
+                self:Connection(GameData.Events.Damage.Event:Connect(function(Data)
+                    if GameData.Data.KillAuraTarget and Data.Damaged == GameData.Data.KillAuraTarget then
+                        KillAuraData.Data.PlayerDamaged = true
+                        task.delay(0.02, function()
+                            KillAuraData.Data.PlayerDamaged = false
+                        end)
+                    end
+                end))
+
+                self:Connection(RunService.PreRender:Connect(function()
+                    if KillAuraData.Settings.Delay > (os.clock() - KillAuraData.Data.LastHit) then
+                        return
+                    end
+
                     local Sword = GetSword()
-                    local Delay = 0.001
-                    if Sword.Item and GameData.Utils.Store:getState().Game.matchstate == GameData.Utils.MatchStates.RUNNING and Night:IsAlive(LocalPlayer) then
-                        Delay = Sword.AttackSpeed / 13
-                        
+                    if Sword.Item and GameData.Utils.Store:getState().Game.matchstate == GameData.Utils.MatchStates.RUNNING and Night:IsAlive(LocalPlayer) then                        
                         if KillAuraData.Settings.TriggerButton and not KillAuraData.Data.TriggerHeld then
                             task.wait()
-                            continue
+                            return
                         end
 
                         local NearestEntity = GetNearestEntity(true)
-                        if NearestEntity.Entity and KillAuraData.Settings.Range >= NearestEntity.Distance and Night:IsAlive(NearestEntity.Entity, true) then
+                        if NearestEntity.Entity and (KillAuraData.Settings.Range >= NearestEntity.Distance or KillAuraData.Settings.InfRange) and Night:IsAlive(NearestEntity.Entity, true) then
                             if KillAuraData.Settings.WallCheck then
                                 KillAuraData.Data.Params.FilterType = Enum.RaycastFilterType.Exclude
                                 KillAuraData.Data.Params.FilterDescendantsInstances = CollectionService:GetTagged("entity")
 
                                 if not IsPathClear(NearestEntity.Entity, NearestEntity.Entity.PrimaryPart, KillAuraData.Data.Params) then
                                     task.wait()
-                                    continue
+                                    return
                                 end
                             end
 
                             if GetAngle(LocalPlayer.Character.PrimaryPart.CFrame, NearestEntity.Entity.PrimaryPart.Position) > (KillAuraData.Settings.MaxAngle / 2 * math.pi / 180) then
                                 task.wait()
-                                continue
+                                return
                             end 
 
                             local HandItem = GetInventory().hand
@@ -1198,11 +1233,11 @@ end)();
                                     local Meta = GameData.Utils.ItemMeta[HandItem.itemType]
                                     if not Meta or not Meta.sword then
                                         task.wait()
-                                        continue
+                                        return
                                     end
                                 else
                                     task.wait()
-                                    continue
+                                    return
                                 end
                             end
 
@@ -1211,9 +1246,10 @@ end)();
                                 SwitchItem(Sword.Item, true)
                             end
 
+                            local Box: Part
                             if KillAuraData.Settings.Boxes then
                                 coroutine.wrap(function()
-                                    local Box: Part = KillAuraData.Data.Effects.Boxes[NearestEntity.Entity]
+                                    Box = KillAuraData.Data.Effects.Boxes[NearestEntity.Entity]
                                     if not Box then
                                         Box = Instance.new("Part", NearestEntity.Entity)
                                         Box.Size = Vector3.new(5, 6, 5)
@@ -1249,6 +1285,18 @@ end)();
                             end
 
                             local HitPos: Vector3 = CalcPrediction(LocalPlayer.Character.PrimaryPart.Position, NearestEntity.Entity.PrimaryPart.Position, KillAuraData.Settings.Range)
+                            if KillAuraData.Settings.InfRange and NearestEntity.Distance > 28 and not KillAuraData.Data.PlayerDamaged then
+                                local Old = NearestEntity.Entity.PrimaryPart.CFrame
+                                NearestEntity.Entity.PrimaryPart.CFrame = LocalPlayer.Character.PrimaryPart.CFrame   
+                                if Box then
+                                    Box.CFrame = Old 
+                                end
+
+                                if KillAuraData.Data.PlayerDamaged then
+                                    NearestEntity.Entity.PrimaryPart.CFrame = Old
+                                end
+                            end
+
                             GameData.Utils.Remotes:Get("SwordHit"):SendToServer({
                                 entityInstance = NearestEntity.Entity,
                                 chargedAttack = {chargeRatio = 0},
@@ -1295,9 +1343,13 @@ end)();
                                         KillAuraData.Data.AnimationPlaying = false
                                     end
                                 end)()
+                            else
+                                if not KillAuraData.Settings.NoSwing then
+                                    GameData.Utils.ViewmodelController:playAnimation(15)
+                                end
                             end
 
-                            task.wait((Delay + KillAuraData.Settings.Delay) - 0.1) 
+                            KillAuraData.Data.LastHit = os.clock()
                         else
                             GameData.Data.KillAuraTarget = nil
                             KillAuraData.Data.AnimationPlaying = false
@@ -1322,9 +1374,7 @@ end)();
                             end
                         end
                     end
-
-                    task.wait()
-                until not self.Enabled
+                end))
             else
                 GameData.Data.KillAuraTarget = nil
                 KillAuraData.Data.AnimationPlaying = false
@@ -1476,6 +1526,15 @@ end)();
             KillAuraData.Settings.SelectedAnimation = value
         end
     })
+
+    KillAura:MiniToggle({
+        Name = "Infinite Range",
+        Flag = "KillAuraInfiniteRange",
+        CallingFunction = function(self, value: boolean)
+            KillAuraData.Settings.InfRange = value
+        end
+    })
+
 
     KillAura:MiniToggle({
         Name = "Target Box",
@@ -3442,12 +3501,15 @@ end)();
                     end
                 end))
 
-                self:Connection(RunService.PreSimulation:Connect(function()
-                    if AntiHitData.Data.Clone and Night:IsAlive(LocalPlayer) and isnetworkowner(LocalPlayer.Character.PrimaryPart) then
-                        local PrimaryPart: BasePart = LocalPlayer.Character.PrimaryPart
-                        local ClonePart: Part = AntiHitData.Data.Clone.Clone
+                self:Connection(RunService.PreRender:Connect(function()
+                    if AntiHitData.Data.Clone and Night:IsAlive(LocalPlayer) then
+                        local RealClone: BasePart = AntiHitData.Data.Clone.Clone
+                        local OldRoot: BasePart = AntiHitData.Data.Clone.PrimaryPart
 
-                        ClonePart.CFrame = CFrame.new(PrimaryPart.Position.X, ClonePart.Position.Y, PrimaryPart.Position.Z)
+                        RealClone.CFrame = CFrame.lookAlong(Vector3.new(OldRoot.Position.X, RealClone.Position.Y, OldRoot.Position.Z), OldRoot.CFrame.LookVector)
+                        if LocalPlayer.Character.Humanoid:GetState() == Enum.HumanoidStateType.Jumping then
+                            RealClone.AssemblyLinearVelocity = Vector3.new(RealClone.AssemblyLinearVelocity.X, OldRoot.AssemblyLinearVelocity.Y, RealClone.AssemblyLinearVelocity.Z)
+                        end
                     end
                 end))
 
@@ -3462,11 +3524,11 @@ end)();
                     end
 
                     if Night:IsAlive(LocalPlayer) and NearestEntity.Entity and AntiHitData.Settings.Distance >= NearestEntity.Distance and (AntiHitData.Settings.PlayersOnly and NearestEntity.Data.Player or not AntiHitData.Settings.PlayersOnly) then
-                        local PrimaryPart: BasePart = LocalPlayer.Character.PrimaryPart
                         if not AntiHitData.Data.Clone then
                             AntiHitData.Data.Clone = MakeClone()
                         end
 
+                        local PrimaryPart: BasePart = AntiHitData.Data.Clone.PrimaryPart --LocalPlayer.Character.PrimaryPart
                         AntiHitData.Data.Target = NearestEntity.Entity                        
                         repeat 
                             local NewEntity =  GetNearestEntity(true)
@@ -3476,7 +3538,7 @@ end)();
                             task.wait() 
                         until AntiHitData.Data.CanTeleport or not AntiHitData.Settings.WaitUntilDamage
                         
-                        if self.Enabled and AntiHitData.Data.Clone and isnetworkowner(LocalPlayer.Character.PrimaryPart) then
+                        if self.Enabled and AntiHitData.Data.Clone and Night:IsAlive(LocalPlayer) and isnetworkowner(LocalPlayer.Character.PrimaryPart) then
                             if AntiHitData.Settings.StayUp then
                                 PrimaryPart.CFrame = AntiHitData.Data.Clone.Clone.CFrame + Vector3.new(0, AntiHitData.Settings.Height, 0)
                                 task.wait(AntiHitData.Settings.StayUp)
@@ -3501,11 +3563,16 @@ end)();
                 until not self.Enabled
             else
                 AntiHitData.Data.Target = nil
+                local NewCF: CFrame
                 if AntiHitData.Data.Clone then
+                    NewCF = AntiHitData.Data.Clone.Clone.CFrame
                     AntiHitData.Data.Clone:Destroy()
                 end
 
                 AntiHitData.Data.Clone = nil
+                if NewCF and Night:IsAlive(LocalPlayer) then
+                    LocalPlayer.Character.PrimaryPart.CFrame = NewCF
+                end
             end
         end
     })
