@@ -1088,7 +1088,6 @@ end)();
             TriggerButton = false,
             Boxes = false,
             Particles = false,
-            InfRange = false,
             SelectedAnimation = "Night",
             BoxColor = Color3.fromRGB(255, 0, 0),
             ParticleColor = Color3.fromRGB(255, 0, 0),
@@ -1099,7 +1098,6 @@ end)();
         Data = {
             OldPlayAnimationViewModel = nil,
             AnimationPlaying = false,
-            PlayerDamaged = false,
             OriginalHandPos = nil,
             TimesRanOnCooldown = 0,
             TriggerHeld = false,
@@ -1189,15 +1187,6 @@ end)();
                     end)
                 end)()
 
-                self:Connection(GameData.Events.Damage.Event:Connect(function(Data)
-                    if GameData.Data.KillAuraTarget and Data.Damaged == GameData.Data.KillAuraTarget then
-                        KillAuraData.Data.PlayerDamaged = true
-                        task.delay(0.02, function()
-                            KillAuraData.Data.PlayerDamaged = false
-                        end)
-                    end
-                end))
-
                 self:Connection(RunService.PreRender:Connect(function()
                     if KillAuraData.Settings.Delay > (os.clock() - KillAuraData.Data.LastHit) then
                         return
@@ -1211,7 +1200,7 @@ end)();
                         end
 
                         local NearestEntity = GetNearestEntity(true)
-                        if NearestEntity.Entity and (KillAuraData.Settings.Range >= NearestEntity.Distance or KillAuraData.Settings.InfRange) and Night:IsAlive(NearestEntity.Entity, true) then
+                        if NearestEntity.Entity and KillAuraData.Settings.Range >= NearestEntity.Distance and Night:IsAlive(NearestEntity.Entity, true) then
                             if KillAuraData.Settings.WallCheck then
                                 KillAuraData.Data.Params.FilterType = Enum.RaycastFilterType.Exclude
                                 KillAuraData.Data.Params.FilterDescendantsInstances = CollectionService:GetTagged("entity")
@@ -1285,18 +1274,6 @@ end)();
                             end
 
                             local HitPos: Vector3 = CalcPrediction(LocalPlayer.Character.PrimaryPart.Position, NearestEntity.Entity.PrimaryPart.Position, KillAuraData.Settings.Range)
-                            if KillAuraData.Settings.InfRange and NearestEntity.Distance > 28 and not KillAuraData.Data.PlayerDamaged then
-                                local Old = NearestEntity.Entity.PrimaryPart.CFrame
-                                NearestEntity.Entity.PrimaryPart.CFrame = LocalPlayer.Character.PrimaryPart.CFrame   
-                                if Box then
-                                    Box.CFrame = Old 
-                                end
-
-                                if KillAuraData.Data.PlayerDamaged then
-                                    NearestEntity.Entity.PrimaryPart.CFrame = Old
-                                end
-                            end
-
                             GameData.Utils.Remotes:Get("SwordHit"):SendToServer({
                                 entityInstance = NearestEntity.Entity,
                                 chargedAttack = {chargeRatio = 0},
@@ -1526,15 +1503,6 @@ end)();
             KillAuraData.Settings.SelectedAnimation = value
         end
     })
-
-    KillAura:MiniToggle({
-        Name = "Infinite Range",
-        Flag = "KillAuraInfiniteRange",
-        CallingFunction = function(self, value: boolean)
-            KillAuraData.Settings.InfRange = value
-        end
-    })
-
 
     KillAura:MiniToggle({
         Name = "Target Box",
