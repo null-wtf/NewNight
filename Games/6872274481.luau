@@ -1088,6 +1088,7 @@ end)();
             TriggerButton = false,
             Boxes = false,
             Particles = false,
+            InfRange = false,
             SelectedAnimation = "Night",
             BoxColor = Color3.fromRGB(255, 0, 0),
             ParticleColor = Color3.fromRGB(255, 0, 0),
@@ -1098,6 +1099,7 @@ end)();
         Data = {
             OldPlayAnimationViewModel = nil,
             AnimationPlaying = false,
+            PlayerDamaged = false,
             OriginalHandPos = nil,
             TimesRanOnCooldown = 0,
             TriggerHeld = false,
@@ -1200,7 +1202,7 @@ end)();
                         end
 
                         local NearestEntity = GetNearestEntity(true)
-                        if NearestEntity.Entity and KillAuraData.Settings.Range >= NearestEntity.Distance and Night:IsAlive(NearestEntity.Entity, true) then
+                        if NearestEntity.Entity and (KillAuraData.Settings.Range >= NearestEntity.Distance or KillAuraData.Settings.InfRange) and Night:IsAlive(NearestEntity.Entity, true) then
                             if KillAuraData.Settings.WallCheck then
                                 KillAuraData.Data.Params.FilterType = Enum.RaycastFilterType.Exclude
                                 KillAuraData.Data.Params.FilterDescendantsInstances = CollectionService:GetTagged("entity")
@@ -1273,14 +1275,14 @@ end)();
                                 end)()
                             end
 
-                            local HitPos: Vector3 = CalcPrediction(LocalPlayer.Character.PrimaryPart.Position, NearestEntity.Entity.PrimaryPart.Position, KillAuraData.Settings.Range)
+                            local HitPos: Vector3 = (KillAuraData.Settings.InfRange and vector.create(0/0, 0/0, 0/0) or CalcPrediction(LocalPlayer.Character.PrimaryPart.Position, NearestEntity.Entity.PrimaryPart.Position, KillAuraData.Settings.Range))
                             GameData.Utils.Remotes:Get("SwordHit"):SendToServer({
                                 entityInstance = NearestEntity.Entity,
                                 chargedAttack = {chargeRatio = 0},
                                 validate = {
-                                    targetPosition = {value = NearestEntity.Data.Root.Position},
+                                    targetPosition = {value = (KillAuraData.Settings.InfRange and vector.create(0/0, 0/0, 0/0) or NearestEntity.Data.Root.Position)},
                                     raycast = {
-                                        cursorDirection = {value = CFrame.lookAt(NearestEntity.Data.Root.Position, CurrentCamera.CFrame.Position)},
+                                        cursorDirection = {value = (KillAuraData.Settings.InfRange and vector.create(0/0, 0/0, 0/0) or CFrame.lookAt(NearestEntity.Data.Root.Position, CurrentCamera.CFrame.Position))},
                                         cameraPosition = {value = HitPos}
                                     },
                                     selfPosition = {value = HitPos}
@@ -1503,6 +1505,15 @@ end)();
             KillAuraData.Settings.SelectedAnimation = value
         end
     })
+
+    KillAura:MiniToggle({
+        Name = "Infinite Range",
+        Flag = "KillAuraInfiniteRange",
+        CallingFunction = function(self, value: boolean)
+            KillAuraData.Settings.InfRange = value
+        end
+    })
+
 
     KillAura:MiniToggle({
         Name = "Target Box",
