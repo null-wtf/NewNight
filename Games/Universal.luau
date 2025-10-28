@@ -2802,7 +2802,7 @@ end)();
 
                 pcall(function()
                     Lighting.GlobalShadows = env.GlobalShadows
-                    Lighting.Brightness = env.Brightness
+                    Lighting.Brightness = (env.Brightness or 0)
                     Lighting.OutdoorAmbient = env.OutdoorAmbient
                     Lighting.Ambient = env.Ambient
                     Lighting.FogStart = env.FogStart
