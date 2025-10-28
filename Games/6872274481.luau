@@ -12,6 +12,7 @@ local UserInputService: UserInputService = Night.cloneref(game:GetService("UserI
 local HttpService: HttpService = Night.cloneref(game:GetService("HttpService"))
 local StarterGui: StarterGui = Night.cloneref(game:GetService("StarterGui"))
 local Stats: Stats = Night.cloneref(game:GetService("Stats")):FindFirstChild("PerfromanceStats")
+local TextChatService: TextChatService = Night.cloneref(game:GetService("TextChatService"))
 
 local LocalPlayer: Player = Players.LocalPlayer
 local PlayerGui: PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
@@ -57,12 +58,18 @@ local GameData = {
         BlockClient = require(LocalPlayer.PlayerScripts.TS.lib["block-engine"]["client-block-engine"]).ClientBlockEngine,
         QueueController = Knit.Controllers.QueueController,
         ClawHandController = Knit.Controllers.SummonerClawHandController,
+        DaoController = Knit.Controllers.DaoController,
+        SwordController = Knit.Controllers.SwordController,
+        PlaceController = Knit.Controllers.BlockPlacementController,
         SummonerKitBalance = require(ReplicatedStorage.TS.games.bedwars.kit.kits.summoner["summoner-kit-balance"]).SummonerKitBalance,
-        AbilityController = Flamework.resolveDependency("@easy-games/game-core:client/controllers/ability/ability-controller@AbilityController")
+        AbilityController = Flamework.resolveDependency("@easy-games/game-core:client/controllers/ability/ability-controller@AbilityController"),
+        UILayer = require(ReplicatedStorage.rbxts_include.node_modules["@easy-games"]["game-core"].out).UILayers
     },
     Events = {
         Damage = Instance.new("BindableEvent"),
-        Death = Instance.new("BindableEvent")
+        Death = Instance.new("BindableEvent"),
+        BedBreak = Instance.new("BindableEvent"),
+        MatchEnd = Instance.new("BindableEvent")
     },
     Data = {
         KillAuraTarget = nil
@@ -104,8 +111,27 @@ task.spawn(function()
             RespawnTime = Data.respawnDuration,
             Type = {Value = GameData.Utils.DamageTypes[Data.damageType], Number = Data.damageType},
             Final = Data.finalKill,
+            Killer = Data.fromEntity,
             Killed = Data.entityInstance,
             KilledPlayer = Players:GetPlayerFromCharacter(Data.entityInstance)
+        })
+    end))
+
+    Assets.Connections:Add(GameData.Utils.Remotes:Get("BedwarsBedBreak"):Connect(function(Data)
+        if Data.player == LocalPlayer then
+            GameData.Events.BedBreak:Fire({
+                BedBlockPos = Data.bedBlockPosition,
+                TeamName = Data.brokenBedTeam.displayName or "Unknown",
+                TeamColor = Data.brokenBedTeam.colorHex or 0
+            })
+        end
+    end))
+
+    Assets.Connections:Add(GameData.Utils.Remotes:Get("MatchEndEvent"):Connect(function(Data)
+        GameData.Events.MatchEnd:Fire({
+            TeamID = Data.winningTeamId,
+            OldLeaderboard = Data.previousLeaderboardPosition,
+            NewLeaderboard = Data.newLeaderboardPosition
         })
     end))
 end)
@@ -679,6 +705,7 @@ Windows.Render.Modules.TargetHUD:Destroy()
 Windows.Movement.Modules.UniversalWallClimb:Destroy()
 Windows.Utility.Modules.UniversalAntiAFK:Destroy()
 Windows.Movement.Modules.UniversalNoClip:Destroy();
+--Windows.Combat.Modules.UniversalAutoClicker:Destroy();
 
 (function()
     local SpeedData = {
@@ -841,13 +868,16 @@ end)();
             PulseTime = 2,
             Pulse = false,
             TpDown = false,
-            UseBoost = false
+            UseBoost = false,
+            UseFlyBar = false,
+            DisableWhenOutOfTime = false
         },
         Data = {
             Vertical = 0,
             LastBoosted = os.clock(),
             LastOnGround = os.clock(),
-            Params = RaycastParams.new()
+            Params = RaycastParams.new(),
+            FlyBar = nil
         }
     }
 
@@ -871,6 +901,10 @@ end)();
                 end
 
                 FlyData.Data.LastOnGround = os.clock()
+                if FlyData.Settings.UseFlyBar then
+                    FlyData.Data.FlyBar = Night:Countdown(2.5)
+                end
+
                 repeat
                     if Night:IsAlive(LocalPlayer) and isnetworkowner(LocalPlayer.Character.PrimaryPart) then
                         local Root: BasePart = LocalPlayer.Character.PrimaryPart
@@ -923,7 +957,7 @@ end)();
                                 SpeedVelocity.Z
                             )
 
-                            if (os.clock() - FlyData.Data.LastOnGround) >= 1.9 and FlyData.Settings.TpDown then
+                            if (os.clock() - FlyData.Data.LastOnGround) >= 2.3 and FlyData.Settings.TpDown then
                                 local Ray: RaycastResult = workspace:Raycast(Root.Position, Vector3.new(0, -1000, 0), FlyData.Data.Params)
                                 if Ray then
                                     local OldCFrame: CFrame = Root.CFrame
@@ -931,7 +965,21 @@ end)();
                                     task.delay(0.1, function()
                                         Root.CFrame = OldCFrame
                                     end)
+                                else
+                                    if FlyData.Settings.DisableWhenOutOfTime and (os.clock() - FlyData.Data.LastOnGround) >= 2.5 then
+                                        self:SetValue(false)
+                                        break
+                                    end
                                 end
+                            else
+                                if FlyData.Settings.DisableWhenOutOfTime and (os.clock() - FlyData.Data.LastOnGround) >= 2.5 then
+                                    self:SetValue(false)
+                                    break
+                                end
+                            end
+                            
+                            if FlyData.Data.FlyBar then
+                                FlyData.Data.FlyBar:Update(string.format("%.1f", (FlyData.Data.LastOnGround + 2.5) - os.clock()))
                             end
 
                             if FlyData.Settings.Pulse and (os.clock() - FlyData.Data.LastBoosted) >= FlyData.Settings.PulseDelay then
@@ -945,6 +993,11 @@ end)();
                     end
                     task.wait()
                 until not self.Enabled
+            else
+                if FlyData.Data.FlyBar then
+                    FlyData.Data.FlyBar:Destroy()
+                    FlyData.Data.FlyBar = nil
+                end
             end
         end
     })
@@ -1024,6 +1077,33 @@ end)();
         Increment = 0.1,
         CallingFunction = function(self, value: number)
             FlyData.Settings.PulseTime = value
+        end
+    })
+
+    Fly:MiniToggle({
+        Name = "Time Bar",
+        Flag = "FlyTimeBar",
+        Default = true,
+        CallingFunction = function(self, value: boolean)
+            FlyData.Settings.UseFlyBar = value
+            if not value then
+                if FlyData.Data.FlyBar then
+                    FlyData.Data.FlyBar:Destroy()
+                    FlyData.Data.FlyBar = nil
+                end
+            else
+                if Fly.Enabled and not FlyData.Data.FlyBar then
+                    FlyData.Data.FlyBar = Night:Countdown(2)
+                end
+            end
+        end
+    })
+
+    Fly:MiniToggle({
+        Name = "Time Limit",
+        Flag = "FlyTimeLimit",
+        CallingFunction = function(self, value: boolean)
+            FlyData.Settings.DisableWhenOutOfTime = value
         end
     })
 
@@ -1471,9 +1551,9 @@ end)();
         Name = "Animation Restore",
         Flag = "KillAuraAnimationRestoreTime",
         Min = 0,
-        Max = 5,
-        Default = 0.1,
-        Increment = 0.1,
+        Max = 1,
+        Default = 0.5,
+        Increment = 0.01,
         CallingFunction = function(self, value: number)
             KillAuraData.Settings.AnimationRestoreTime = value
         end
@@ -2041,6 +2121,11 @@ end)();
     })
 end)();
 
+local function GetBlockPlace(pos: Vector3)
+    local Round = GameData.Utils.BlockEngine:getBlockPosition(pos)
+    return GameData.Utils.BlockEngine:getStore():getBlockAt(Round), Round
+end
+
 (function()
     local ScaffoldData = {
         Settings = {
@@ -2056,11 +2141,6 @@ end)();
             Pos = Vector3.zero
         }
     }
-
-    local function GetBlockPlace(pos: Vector3)
-        local Round = GameData.Utils.BlockEngine:getBlockPosition(pos)
-        return GameData.Utils.BlockEngine:getStore():getBlockAt(Round), Round
-    end
 
     local function CheckBlockPos(pos: Vector3)
         for _, Offset in next, ScaffoldData.Data.Blocks do
@@ -3028,6 +3108,8 @@ end)();
     local StartTime: number = 0
     local Height: number = 12
     local UseBoost: boolean = false
+    local UseTimeUI: boolean = false
+    local TimeUI
 
     local LongJump = Windows.Movement:CreateModule({
         Name = "Long Jump",
@@ -3042,6 +3124,10 @@ end)();
                 local Fly = Windows.Movement.Modules.Fly
                 if Fly.Enabled then
                     Fly:SetValue(false)
+                end
+
+                if UseTimeUI then
+                    TimeUI = Night:Countdown(Time)
                 end
 
                 local FireBall = GetItem("fireball")
@@ -3065,7 +3151,7 @@ end)();
                     SwitchItem(FireBall.tool, true)
                     GameData.Utils.Remotes:Get("ProjectileFire"):CallServerAsync(
                         FireBall.tool, FireBall.itemType, FireBall.itemType,
-                        PrimaryPart.Position, PrimaryPart.Position, vector.new(0, -30, 0),
+                        PrimaryPart.Position, PrimaryPart.Position, vector.create(0, -30, 0),
                         HttpService:GenerateGUID(false),
                         {
                             drawDurationSec = 0,
@@ -3105,6 +3191,11 @@ end)();
                     end
                     
                     Boosted = not Boosted
+
+                    if TimeUI then
+                        TimeUI:Update(string.format("%.1f", (StartTime + Time) - os.clock()))
+                    end
+
                     task.wait()
                 until not self.Enabled or (os.clock() - StartTime) >= Time
 
@@ -3112,6 +3203,11 @@ end)();
             else
                 if Night:IsAlive(LocalPlayer) then
                     LocalPlayer.Character.PrimaryPart.Anchored = false
+                end
+
+                if TimeUI then
+                    TimeUI:Destroy()
+                    TimeUI = nil
                 end
             end
         end
@@ -3148,6 +3244,25 @@ end)();
         Default = 15,
         CallingFunction = function(self, value: number)
             Height = value
+        end
+    })
+
+    LongJump:MiniToggle({
+        Name = "Time Bar",
+        Flag = "LongJumpTimeBar",
+        Default = true,
+        CallingFunction = function(self, value: boolean)
+            UseTimeUI = value
+            if value then
+                if LongJump.Enabled and not TimeUI then
+                    TimeUI = Night:Countdown(Time)
+                end
+            else
+                if TimeUI then
+                    TimeUI:Destroy()
+                    TimeUI = nil
+                end
+            end
         end
     })
 
@@ -3493,6 +3608,8 @@ end)();
         Flag = "AntiHit",
         CallingFunction = function(self, enabled: boolean)
             if enabled then
+                repeat task.wait() until GameData.Utils.Store:getState().Game.matchstate ~= 0
+
                 self:Connection(GameData.Events.Damage.Event:Connect(function(Data)
                     if AntiHitData.Data.Target and Data.Damaged == AntiHitData.Data.Target then
                         AntiHitData.Data.CanTeleport = true
@@ -3889,14 +4006,14 @@ end)();
         Flag = "AntiAFK",
         CallingFunction = function(self, enabled: boolean)
             if enabled then
-                for i,v in getconnections(LocalPlayer.Idled) do
+                for _, v in getconnections(LocalPlayer.Idled) do
                     if v.Enabled then
                         v:Disable()
                         table.insert(Restore, v)
                     end
                 end
 
-                for i,v in getconnections(RunService.Heartbeat) do
+                for _, v in getconnections(RunService.Heartbeat) do
                     if v.Function and typeof(v.Function) == "function" and v.Enabled then
                         local Constants = debug.getconstants(v.Function)
                         if #Constants > 0 and table.find(Constants, "AfkInfo") then
@@ -3959,52 +4076,106 @@ end)();
     })
 end)();
 
+local function GetYLevel()
+    local YLevel: number = math.huge
+    local BlockStore = GameData.Utils.BlockEngine:getStore()
+    for _, v in BlockStore:getAllBlockPositions() do
+        local Block = BlockStore:getBlockAt(v + Vector3.new(0, 3, 0))
+        if Block and YLevel > v.Y then
+            YLevel = v.Y
+            return YLevel
+        end
+    end
+    return 0
+end
+
 (function()
     local Part: Part
-    local Color = Color3.fromRGB(255, 0, 0)
-    local Transparency: number = 0.5
-    local Mode: string = "Velocity"
-    local Power: number = 200
-    local TweenSpeed: number = 0.2
-    local DebounceTime: number = 0.2
     local LastCF: CFrame
     local Debounce: number = 0
-    local UseDebounce: boolean = false
+
+    local AntiVoidData = {
+        Loop = 20,
+        Add = 8,
+        Del = 0.4,
+        Times = 3,
+        Power = 10,
+        Jumps = 7,
+        Transparency = 0.5,
+        Velo = 150,
+        Speed = 0.2,
+        DebounceTime = 0.2,
+        UseDebounce = false,
+        Mode = "Launch",
+        Material = "Air",
+        Color = Color3.fromRGB(255, 0, 0)
+    }
 
     local AntiVoid = Windows.Utility:CreateModule({
         Name = "Anti Void",
         Flag = "AntiVoid",
         CallingFunction = function(self, enabled: boolean)
             if enabled then
-                local YLevel: number = math.huge
-                local BlockStore = GameData.Utils.BlockEngine:getStore()
-                for i,v in BlockStore:getAllBlockPositions() do
-                    local Block = BlockStore:getBlockAt(v + Vector3.new(0, 3, 0))
-                    if Block and YLevel > v.Y then
-                        YLevel = v.Y
-                    end
-                end
-
                 Part = Instance.new("Part", workspace)
-                Part.Position = Vector3.new(0, YLevel, 0)
+                Part.Position = Vector3.new(0, GetYLevel(), 0)
                 Part.Size = Vector3.new(100000, 1, 100000)
-                Part.Color = Color
+                Part.Color = AntiVoidData.Color
                 Part.Anchored = true
-                Part.Transparency = Transparency
-                Part.Material = Enum.Material.Air
+                Part.Transparency = AntiVoidData.Transparency
+                Part.Material = Enum.Material[AntiVoidData.Material]
+                Part.CanCollide = AntiVoidData.Mode ~= "Launch"
                 GameData.Utils.GameQuery:setQueryIgnored(Part)
 
+                local Pos = Night:IsAlive(LocalPlayer) and LocalPlayer.Character.HumanoidRootPart.Position.Y + 10
+                task.spawn(function()
+                    repeat
+                        Part.Color = AntiVoidData.Color
+                        Part.Transparency = AntiVoidData.Transparency
+                        Part.Material = Enum.Material[AntiVoidData.Material]
+                        Part.CanCollide = AntiVoidData.Mode ~= "Launch"
+
+                        if LocalPlayer.Character.Humanoid.FloorMaterial ~= Enum.Material.Air then
+                            Pos = LocalPlayer.Character.HumanoidRootPart.Position.Y
+                        end
+                        task.wait()
+                    until not self.Enabled
+                end)
+
+                local Bounce = false
                 self:Connection(Part.Touched:Connect(function(Part: Part)
-                    if Night:IsAlive(LocalPlayer) and Part.Parent == LocalPlayer.Character and ((os.clock() - Debounce) >= DebounceTime or not UseDebounce) then
-                        local PrimaryPart: BasePart = LocalPlayer.Character.PrimaryPart                        
-                        if Mode == "Velocity" then
+                    if Night:IsAlive(LocalPlayer) and Part.Parent == LocalPlayer.Character and ((os.clock() - Debounce) >= AntiVoidData.DebounceTime or not AntiVoidData.UseDebounce) and not Bounce then
+                        Bounce = true
+                        local PrimaryPart: BasePart = LocalPlayer.Character.PrimaryPart    
+                        if AntiVoidData.Mode == "Launch" then
+                            for i = 1, AntiVoidData.Loop do
+                                task.wait(AntiVoidData.Del / 10)
+                                LocalPlayer.Character.HumanoidRootPart.Velocity = Vector3.new(0, i * (Pos - LocalPlayer.Character.HumanoidRootPart.Position.Y + AntiVoidData.Add), 0)
+                            end
+                        elseif AntiVoidData.Mode == "Teleport" then
+                            local Grav = workspace.Gravity
+                            workspace.Gravity = 0
+
+                            LocalPlayer.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+                            for _ = 1, AntiVoidData.Times do
+                                LocalPlayer.Character.HumanoidRootPart.CFrame += Vector3.new(0, AntiVoidData.Power, 0)
+                                task.wait(AntiVoidData.Times / 20)
+                            end
+
+                            workspace.Gravity = Grav
+                        elseif AntiVoidData.Mode == "Jump" then
+                            for _ = 1, AntiVoidData.Jumps do
+                                LocalPlayer.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+                                task.wait(0.1)
+                            end
+                        elseif AntiVoidData.Mode == "Velocity" then
                             local Current: Vector3 = PrimaryPart.AssemblyLinearVelocity
-                            PrimaryPart.AssemblyLinearVelocity = Vector3.new(Current.X, Power, Current.Z)
-                        elseif Mode == "Tween" then
+                            PrimaryPart.AssemblyLinearVelocity = Vector3.new(Current.X, AntiVoidData.Velo, Current.Z)
+                        elseif AntiVoidData.Mode == "Tween" then
                             if LastCF then
-                                TweenService:Create(PrimaryPart, TweenInfo.new(TweenSpeed), {CFrame = LastCF}):Play()
+                                TweenService:Create(PrimaryPart, TweenInfo.new(AntiVoidData.Speed), {CFrame = LastCF}):Play()
                             end
                         end
+                        Bounce = false   
                     end
                 end))
 
@@ -4023,16 +4194,20 @@ end)();
         end
     })
 
-    local PowerSlider, TweenSpeedSlider
+    local PowerSlider, TweenSpeedSlider, JumpSlider
+    local AntiVoidLaunch, AntiVoidTP = {}, {}
     AntiVoid:Dropdown({
         Name = "Mode",
         Flag = "AntiVoidMode",
-        Options = {"Velocity", "Tween", "Walk"},
-        Default = "Velocity",
+        Options = {"Launch", "Teleport", "Jump", "Velocity", "Tween", "Walk"},
+        Default = "Launch",
         CallingFunction = function(self, value: string)
-            Mode = value
+            AntiVoidData.Mode = value
             PowerSlider:SetVisiblity(value == "Velocity")
             TweenSpeedSlider:SetVisiblity(value == "Tween")
+            for _, v in next, AntiVoidLaunch do v:SetVisiblity(value == "Launch") end
+            for _, v in next, AntiVoidTP do v:SetVisiblity(value == "Teleport") end
+            JumpSlider:SetVisiblity(value == "Jump")
         end
     })
 
@@ -4040,9 +4215,8 @@ end)();
     AntiVoid:MiniToggle({
         Name = "Debounce",
         Flag = "AntiVoidDebounce",
-        Default = true,
         CallingFunction = function(self, value: boolean)
-            UseDebounce = value
+            AntiVoidData.UseDebounce = value
             DebounceTimeSlider:SetVisiblity(false)
         end
     })
@@ -4055,18 +4229,85 @@ end)();
         Default = 0.2,
         Increment = 0.1,
         CallingFunction = function(self, value: number)
-            DebounceTime = value
+            AntiVoidData.DebounceTime = value
+        end
+    })
+
+    table.insert(AntiVoidLaunch, AntiVoid:Slider({
+        Name = "Loop",
+        Flag = "AntiVoidLoop",
+        Min = 5,
+        Max = 4,
+        Default = 20,
+        CallingFunction = function(self, value: number)
+            AntiVoidData.Loop = value
+        end
+    }))
+
+    table.insert(AntiVoidLaunch, AntiVoid:Slider({
+        Name = "Height Add",
+        Flag = "AntiVoidAdd",
+        Min = 5,
+        Max = 15,
+        Default = 8,
+        CallingFunction = function(self, value: number)
+            AntiVoidData.Add = value
+        end
+    }))
+
+    table.insert(AntiVoidLaunch, AntiVoid:Slider({
+        Name = "Delay",
+        Flag = "AntiVoidDelay",
+        Min = 0.1,
+        Max = 0.6,
+        Default = 0.4,
+        Increment = 0.01,
+        CallingFunction = function(self, value: number)
+            AntiVoidData.Del = value
+        end
+    }))
+
+    table.insert(AntiVoidTP, AntiVoid:Slider({
+        Name = "TP Times",
+        Flag = "AntiVoidTimes",
+        Min = 1,
+        Max = 5,
+        Default = 3,
+        CallingFunction = function(self, value: number)
+            AntiVoidData.Times = value
+        end
+    }))
+
+    table.insert(AntiVoidTP, AntiVoid:Slider({
+        Name = "Power",
+        Flag = "AntiVoidPower",
+        Min = 5,
+        Max = 15,
+        Default = 10,
+        CallingFunction = function(self, value: number)
+            AntiVoidData.Power = value
+        end
+    }))
+
+    JumpSlider = AntiVoid:Slider({
+        Name = "Jumps",
+        Flag = "AntiVoidJumps",
+        Min = 3,
+        Max = 15,
+        Default = 7,
+        CallingFunction = function(self, value: number)
+            AntiVoidData.Jumps = value
         end
     })
 
     PowerSlider = AntiVoid:Slider({
-        Name = "Power",
+        Name = "Velocity",
         Flag = "AntiVoidVelocityPower",
         Min = 50,
         Max = 400,
         Default = 200,
         CallingFunction = function(self, value: number)
-            Power = value
+            AntiVoidData.Velo = value
         end
     })
 
@@ -4078,7 +4319,7 @@ end)();
         Default = 0.2,
         Increment = 0.01,
         CallingFunction = function(self, value: number)
-            TweenSpeed = value
+            AntiVoidData.Speed = value
         end
     })
 
@@ -4088,9 +4329,9 @@ end)();
         Min = 0,
         Max = 1,
         Default = 0.5,
-        Increment = 0.1,
+        Increment = 0.01,
         CallingFunction = function(self, value: number)
-            Transparency = value
+            AntiVoidData.Transparency = value
             if Part then
                 Part.Transparency = value
             end
@@ -4102,7 +4343,7 @@ end)();
         Flag = "AntiVoidPartColor",
         Default = Color3.fromRGB(255, 0, 0),
         CallingFunction = function(self, value: Color3)
-            Color = value
+            AntiVoidData.Color = value
             if Part then
                 Part.Color = value
             end
@@ -4235,6 +4476,352 @@ end)();
         Default = 0,
         CallingFunction = function(self, value: number)
             ActivationDelay = value
+        end
+    })
+end)();
+
+(function()
+    local Boost = 50
+
+    local AntiSuffocate = Windows.Utility:CreateModule({
+        Name = "Anti Suffocate",
+        Flag = "AntiSuffocate",
+        CallingFunction = function(self, enabled: boolean)
+            if enabled then
+                repeat
+					if Night:IsAlive(LocalPlayer) and LocalPlayer.Character.Humanoid.FloorMaterial ~= Enum.Material.Air then
+						local BlockMid = GetBlockPlace(LocalPlayer.Character.HumanoidRootPart.Position)
+                        local BlockDown = GetBlockPlace(LocalPlayer.Character.HumanoidRootPart.Position - Vector3.new(0, 2, 0))
+                        local BlockUp = GetBlockPlace(LocalPlayer.Character.HumanoidRootPart.Position + Vector3.new(0, 2, 0))
+						if BlockMid and BlockDown and BlockUp then
+							LocalPlayer.Character.HumanoidRootPart.CFrame += Vector3.new(0, Boost, 0)
+						end
+					end
+                    task.wait()
+				until not self.Enabled
+            end
+        end
+    })
+
+    AntiSuffocate:Slider({
+        Name = "Boost",
+        Flag = "AntiSuffocateBoost",
+        Min = 10,
+        Max = 100,
+        Default = 50,
+        CallingFunction = function(self, value: number)
+            Boost = value
+        end
+    })
+end)();
+
+(function()
+    local AutoToxicData = {
+        Kill = false,
+        Bed = false,
+        Win = false,
+        Final = false,
+        Custom = false
+    }
+
+    local Messages = {
+        Kill = {
+            "L <PLR>",
+            "cope <PLR>",
+            "night > <PLR>",
+            "gg ez <PLR>",
+            "get better <PLR>",
+            "easiest kill ever <PLR>"
+        },
+        Bed = {
+            "nice bed <TEAM>",
+            "TEAM has officially lost the game",
+            "amusing defense <TEAM>"
+        },
+        Win = {
+            "gg ez | night on top",
+            "easiest game of my life | night on top",
+            "didn't even have to try | night on top",
+            "bot arena cleared | night on top"
+        }
+    }
+
+    local OldMessages = {
+        Kill = Messages.Kill,
+        Bed = Messages.Bed,
+        Win = Messages.Win
+    }
+
+    local AutoToxic = Windows.Utility:CreateModule({
+        Name = "Auto Toxic",
+        Flag = "AutoToxic",
+        CallingFunction = function(self, enabled: boolean)
+            if enabled then
+                self:Connection(GameData.Events.Death.Event:Connect(function(Value)
+                    if AutoToxicData.Kill and Value.Killer == LocalPlayer.Character and (AutoToxicData.Final and Value.Final or not AutoToxicData.Final) then
+                        TextChatService.TextChannels.RBXGeneral:SendAsync(string.gsub(Messages.Kill[math.random(1, #Messages.Kill)], "<PLR>", Value.KilledPlayer.Name))
+                    end
+                end))
+
+                self:Connection(GameData.Events.BedBreak.Event:Connect(function(Value)
+                    if AutoToxicData.Bed then
+                        TextChatService.TextChannels.RBXGeneral:SendAsync(string.gsub(Messages.Bed[math.random(1, #Messages.Bed)], "<TEAM>", Value.TeamName))
+                    end
+                end))
+
+                self:Connection(GameData.Events.MatchEnd.Event:Connect(function(Value)
+                    if AutoToxicData.Win and Value.TeamID == GameData.Utils.Store:getState().Game.myTeam.id then
+                        TextChatService.TextChannels.RBXGeneral:SendAsync(Messages.Bed[math.random(1, #Messages.Win)])
+                    end
+                end))
+            end
+        end
+    })
+
+    local Final
+    AutoToxic:MiniToggle({
+        Name = "Kill",
+        Flag = "AutoToxicKill",
+        Default = true,
+        CallingFunction = function(self, value: boolean)
+            AutoToxicData.Kill = value
+            Final:SetVisiblity(value)
+        end
+    })
+
+    Final = AutoToxic:MiniToggle({
+        Name = "Final Kill",
+        Flag = "AutoToxicFinalKill",
+        Default = true,
+        CallingFunction = function(self, value: boolean)
+            AutoToxicData.Final = value
+        end
+    })
+
+    AutoToxic:MiniToggle({
+        Name = "Bed Break",
+        Flag = "AutoToxicBedBreak",
+        Default = true,
+        CallingFunction = function(self, value: boolean)
+            AutoToxicData.Bed = value
+        end
+    })
+
+    AutoToxic:MiniToggle({
+        Name = "Win",
+        Flag = "AutoToxicWin",
+        Default = true,
+        CallingFunction = function(self, value: boolean)
+            AutoToxicData.Win = value
+        end
+    })
+
+    local Kill, Bed, Win
+    AutoToxic:MiniToggle({
+        Name = "Custom",
+        Flag = "AutoToxicCustom",
+        CallingFunction = function(self, value: boolean)
+            AutoToxicData.Custom = value
+            Kill:SetVisiblity(value)
+            Bed:SetVisiblity(value)
+            Win:SetVisiblity(value)
+
+            if not value then
+                Messages.Kill = OldMessages.Kill
+                Messages.Bed = OldMessages.Bed
+                Messages.Win = OldMessages.Win
+            end
+        end
+    })
+
+    Kill = AutoToxic:TextBox({
+        Name = "Kill Message",
+        Flag = "AutoToxicKillMessage",
+        Default = "Lowercases, separated by comma (use <PLR>)",
+        CallingFunction = function(self, value: string)
+            if AutoToxicData.Custom then
+                Messages.Kill = Separate(value)
+            end
+        end
+    })
+
+    Bed = AutoToxic:TextBox({
+        Name = "Bed Break Message",
+        Flag = "AutoToxicBedBreakMessage",
+        Default = "Lowercases, separated by comma (use <TEAM>)",
+        CallingFunction = function(self, value: string)
+            if AutoToxicData.Custom then
+                Messages.Bed = Separate(value)
+            end
+        end
+    })
+
+    Win = AutoToxic:TextBox({
+        Name = "Win Message",
+        Flag = "AutoToxicWinMessage",
+        Default = "Lowercases, separated by comma",
+        CallingFunction = function(self, value: string)
+            if AutoToxicData.Custom then
+                Messages.Win = Separate(value)
+            end
+        end
+    })
+end)();
+
+(function()
+    local AutoVoidDropData = {
+        Settings = {
+            Items = {},
+            Position = 70,
+            Delay = 0.1,
+            Owl = false
+        },
+        Other = {Loop = nil}
+    }
+
+    local AutoVoidDrop = Windows.Utility:CreateModule({
+        Name = "Auto Void Drop",
+        Flag = "AutoVoidDrop",
+        CallingFunction = function(self, enabled: boolean)
+            if enabled then
+                repeat task.wait() until GameData.Utils.Store:getState().Game.matchstate ~= 0
+
+                local function VoidDrop()
+                    if AutoVoidDropData.Other.Loop then
+                        task.cancel(AutoVoidDropData.Other.Loop)
+                        AutoVoidDropData.Other.Loop = nil
+                    end
+
+                    AutoVoidDropData.Other.Loop = task.spawn(function()
+                        repeat
+                            if Night:IsAlive(LocalPlayer) and (LocalPlayer.Character:GetAttribute('InflatedBalloons') or 0) <= 0 and LocalPlayer.Character.HumanoidRootPart.Position.Y <= (GetYLevel() - AutoVoidDropData.Settings.Position) then
+                                if (AutoVoidDropData.Settings.Owl and not LocalPlayer.Character.HumanoidRootPart:FindFirstChild('OwlLiftForce')) or not AutoVoidDropData.Settings.Owl then
+                                    for _, v in AutoVoidDropData.Settings.Items do
+                                        local Item = GetItem(v)
+                                        if Item then
+                                            ReplicatedStorage.rbxts_include.node_modules["@rbxts"].net.out._NetManaged.DropItem:InvokeServer({
+                                                item = Item.tool,
+                                                amount = Item.amount
+                                            })
+                                        end
+                                    end
+                                end
+                            end
+                            task.wait(AutoVoidDropData.Settings.Delay)
+                        until not self.Enabled
+                    end)
+                end
+
+                LocalPlayer.CharacterAdded:Connect(VoidDrop)
+                VoidDrop()
+            else
+                if AutoVoidDropData.Other.Loop then
+                    task.cancel(AutoVoidDropData.Other.Loop)
+                    AutoVoidDropData.Other.Loop = nil
+                end
+            end
+        end
+    })
+
+    AutoVoidDrop:TextBox({
+        Name = "Items",
+        Flag = "AutoVoidDropItems",
+        Default = "emerald, diamond, iron",
+        CallingFunction = function(self, value: string)
+            AutoVoidDropData.Settings.Items = Separate(value)
+        end
+    })
+
+    AutoVoidDrop:Slider({
+        Name = "Position",
+        Flag = "AutoVoidDropPosition",
+        Min = 30,
+        Max = 100,
+        Default = 70,
+        CallingFunction = function(self, value: number)
+            AutoVoidDropData.Settings.Position = value
+        end
+    })
+
+    AutoVoidDrop:Slider({
+        Name = "Delay",
+        Flag = "AutoVoidDropDelay",
+        Min = 0.1,
+        Max = 0.3,
+        Default = 0.1,
+        Increment = 0.01,
+        CallingFunction = function(self, value: number)
+            AutoVoidDropData.Settings.Delay = value
+        end
+    })
+
+    AutoVoidDrop:MiniToggle({
+        Name = "Owl Check",
+        Flag = "AutoVoidDropOwl",
+        Default = true,
+        CallingFunction = function(self, value: boolean)
+            AutoVoidDropData.Settings.Owl = value
+        end
+    })
+end)();
+
+(function()
+    local Speed = 0.24
+
+    local FastBreak = Windows.Utility:CreateModule({
+        Name = "Fast Break",
+        Flag = "FastBreak",
+        CallingFunction = function(self, enabled: boolean)
+            if enabled then
+                repeat
+                    GameData.Utils.BlockBreaker.cooldown = Speed
+					task.wait(0.1)
+				until not self.Enabled
+			else
+				GameData.Utils.BlockBreaker.cooldown = 0.3
+            end
+        end
+    })
+
+    FastBreak:Slider({
+        Name = "Speed",
+        Flag = "FastBreakSpeed",
+        Min = 0.01,
+        Max = 0.3,
+        Default = 0.24,
+        Increment = 0.01,
+        CallingFunction = function(self, value: number)
+            Speed = value
+        end
+    })
+end)();
+
+(function()
+    local Distance = 30
+
+    local FarBreak = Windows.Utility:CreateModule({
+        Name = "Far Break",
+        Flag = "FarBreak",
+        CallingFunction = function(self, enabled: boolean)
+            if enabled then
+                repeat
+                    GameData.Utils.BlockBreaker.range = Distance
+					task.wait(0.1)
+				until not self.Enabled
+			else
+				GameData.Utils.BlockBreaker.range = 0.3
+            end
+        end
+    })
+
+    FarBreak:Slider({
+        Name = "Distance",
+        Flag = "FarBreakDistance",
+        Min = 1,
+        Max = 30,
+        Default = 30,
+        CallingFunction = function(self, value: number)
+            Distance = value
         end
     })
 end)();
