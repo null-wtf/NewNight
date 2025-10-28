@@ -589,7 +589,7 @@ do
         return true
     end
 
-    function Assets.Functions:LoadFile(Game: string, LoadConfig: boolean)
+    function Assets.Functions:LoadFile(Game: string, Github: string, LoadConfig: boolean)
         local Path = "NewNight/Games/"..tostring(Game)..".luau"
         local Loaded: boolean = false
 
@@ -602,16 +602,9 @@ do
                 Loaded = true
                 loadstring(readfile(Path))()
             else
-                Loaded = true
-                if http.request then
-                    local Req = http.request({
-                        Url = "https://raw.githubusercontent.com/null-wtf/NewNight/refs/heads/main/Games/"..Game..".luau",
-                        Method = "GET"
-                    })
-
-                    if Req.Success then
-                        loadstring(Req.Body)()
-                    end
+                if Github then
+                    -- come back to
+                    -- Loaded = true
                 end
             end
         end)
@@ -3037,6 +3030,82 @@ function Assets.Functions:CreateTab(Data: {Name: string, Flag: string, Icon: str
     })
 end
 
+function Assets.Functions:Countdown(Time: number, Unit: string)
+    local CountDownData = {
+        MainFrame = nil :: Frame?,
+        Functions = {},
+    }
+
+
+    local MainFrame: Frame = Instance.new("Frame", MainScreenGui)
+    MainFrame.BackgroundColor3 = Color3.fromRGB(8, 10, 13)
+    MainFrame.Position = UDim2.fromScale(0.006, 0.695)
+    MainFrame.AnchorPoint = Vector2.new(0.5, 0)
+    MainFrame.Position = UDim2.fromScale(0.5, 0.7)
+    MainFrame.Size = UDim2.fromOffset(200, 60)
+    MainFrame.ZIndex = 2
+    CountDownData.MainFrame = MainFrame
+    Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 15)
+    CreateShadow(MainFrame)
+
+    local BarMain: Frame = Instance.new("Frame", MainFrame)
+    BarMain.BackgroundColor3 = Color3.fromRGB(14, 16, 23)
+    BarMain.AnchorPoint = Vector2.new(0.5, 0.5)
+    BarMain.Position = UDim2.fromScale(0.5, 0.45)
+    BarMain.Size = UDim2.fromOffset(127, 6)
+    BarMain.ZIndex = 2
+    Instance.new("UICorner", BarMain).CornerRadius = UDim.new(0, 8)
+
+    local BarFill: Frame = Instance.new("Frame", BarMain)
+    BarFill.BackgroundColor3 = UIData.Theme.Other
+    BarFill.Position = UDim2.fromScale(0, 0)
+    BarFill.Size = UDim2.fromScale(1, 1)
+    BarFill.ZIndex = 2
+    Instance.new("UICorner", BarFill).CornerRadius = UDim.new(0, 8)
+    table.insert(UIData.CustomizableItems.Other, {
+        CanChange = true,
+        Item = BarFill
+    })
+
+    local TimeLeftText: TextLabel = Instance.new("TextLabel", MainFrame)
+    TimeLeftText.BackgroundTransparency = 1
+    TimeLeftText.BorderSizePixel = 0
+    TimeLeftText.AnchorPoint = Vector2.new(0.5, 0)
+    TimeLeftText.Position = UDim2.fromScale(0.5, 0.6)
+    TimeLeftText.Size = UDim2.fromOffset(99, 15)
+    TimeLeftText.Font = Enum.Font.BuilderSans
+    TimeLeftText.Text = tostring(Time)..(Unit or "s")
+    TimeLeftText.TextColor3 = Color3.fromRGB(69, 79, 113)
+    TimeLeftText.TextScaled = true
+    TimeLeftText.TextWrapped = true
+    TimeLeftText.ZIndex = 2
+
+    function CountDownData.Functions:Destroy()
+        MainFrame:Destroy()
+        table.clear(CountDownData)
+    end
+
+    function CountDownData.Functions:SetVisiblity(Visible: boolean)
+        if Visible == nil then
+            Visible = not MainFrame.Visible
+        end
+
+        MainFrame.Visible = Visible        
+    end
+
+    function CountDownData.Functions:Update(NewTime: number, Unit: string)
+        TimeLeftText.Text = tostring(NewTime)..(Unit or "s")
+        TweenService:Create(BarFill, TweenInfo.new(0.15), {Size = UDim2.fromScale(math.clamp(tonumber(NewTime) / Time, 0, 1), 1)}):Play()
+    end
+
+
+    setmetatable(CountDownData, {
+        __index = CountDownData.Functions
+    })
+
+    return CountDownData
+end
+
 function Assets.Functions:CreateTargetHud(Data: {Player: Player?, UserData: {Name: string, DisplayName: string, ProfilePic: string?}?, Health: {Current: number, Max: number}?}?)
     if UIData.TargetHud then
         return UIData.TargetHud
@@ -3148,7 +3217,7 @@ function Assets.Functions:CreateTargetHud(Data: {Player: Player?, UserData: {Nam
 
     local HealthBarMain: Frame = Instance.new("Frame", MainFrame)
     HealthBarMain.BackgroundColor3 = Color3.fromRGB(14, 16, 23)
-    HealthBarMain.Position = UDim2.fromScale(0.347, 0.63)
+    HealthBarMain.Position = UDim2.fromScale(0.35, 0.63)
     HealthBarMain.Size = UDim2.fromOffset(127, 6)
     HealthBarMain.ZIndex = 2
     Instance.new("UICorner", HealthBarMain).CornerRadius = UDim.new(0, 8)
@@ -3740,7 +3809,8 @@ UISettingsWindow:CreateModule({
                     if NightInit.Dev and isfile("NewNight/Loader.luau") then
                         loadstring(readfile("NewNight/Loader.luau"))()
                     else
-                        loadstring(game:HttpGet("https://raw.githubusercontent.com/null-wtf/NewNight/refs/heads/main/Loader.luau"))()
+                        -- github
+                        print("github")
                     end
                 ]])()
             end)
