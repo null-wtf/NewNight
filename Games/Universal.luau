@@ -29,6 +29,7 @@ local Lighting: Lighting = Night.cloneref(game:GetService("Lighting"))
 local HttpService: HttpService = Night.cloneref(game:GetService("HttpService"))
 local UserInputService: UserInputService = Night.cloneref(game:GetService("UserInputService"))
 local TweenService: TweenService = Night.cloneref(game:GetService("TweenService"))
+local Terrain: Terrain = workspace:FindFirstChildOfClass("Terrain")
 
 local LocalPlayer = Players.LocalPlayer :: Player
 local CurrentCamera: Camera = workspace.CurrentCamera
@@ -2558,6 +2559,7 @@ end)();
             end
         end
     })
+
     AutoClicker:Dropdown({
         Name = "Click Type",
         Flag = "UniversalAutoClickerClickType",
@@ -2673,6 +2675,508 @@ end)();
         Default = true,
         CallingFunction = function(self, value: boolean)
             TeamCheck = value
+        end
+    })
+end)();
+
+(function()
+    local FPSBoostData = {
+        RemoveParticles = false,
+        RemoveTrails = false,
+        RemoveSmoke = false,
+        RemoveFire = false,
+        RemoveSparkles = false,
+        RemoveBeams = false,
+        RemoveTextures = false,
+        RemoveSurfaceAppearance = false,
+        RemoveCharacterMeshes = false,
+        SimplifyParts = false,
+        LowerLighting = false,
+        RemoveTerrainEffects = false,
+        AutoClean = false
+    }
+
+    local function RemoveMaterials(inst)
+        if not inst then return end
+        if FPSBoostData.RemoveParticles and inst:IsA("ParticleEmitter") then
+            pcall(function() inst:Destroy() end)
+        elseif FPSBoostData.RemoveTrails and inst:IsA("Trail") then
+            pcall(function() inst:Destroy() end)
+        elseif FPSBoostData.RemoveSmoke and inst:IsA("Smoke") then
+            pcall(function() inst:Destroy() end)
+        elseif FPSBoostData.RemoveFire and inst:IsA("Fire") then
+            pcall(function() inst:Destroy() end)
+        elseif FPSBoostData.RemoveSparkles and inst:IsA("Sparkles") then
+            pcall(function() inst:Destroy() end)
+        elseif FPSBoostData.RemoveBeams and inst:IsA("Beam") then
+            pcall(function() inst:Destroy() end)
+        elseif FPSBoostData.RemoveTextures and (inst:IsA("Decal") or inst:IsA("Texture")) then
+            pcall(function() inst.Transparency = 1 end)
+            pcall(function() inst.Texture = "" end)
+        elseif FPSBoostData.RemoveSurfaceAppearance and inst:IsA("SurfaceAppearance") then
+            pcall(function() inst:Destroy() end)
+        elseif FPSBoostData.RemoveCharacterMeshes and inst:IsA("CharacterMesh") then
+            pcall(function() inst:Destroy() end)
+        elseif FPSBoostData.SimplifyParts and inst:IsA("BasePart") then
+            pcall(function() inst.CastShadow = false end)
+            pcall(function() inst.Material = Enum.Material.SmoothPlastic end)
+            pcall(function() inst.Reflectance = 0 end)
+            if inst:IsA("MeshPart") then
+                pcall(function() inst.TextureID = "" end)
+            end
+        end
+    end
+
+    local FPSBoost = Tabs.Render:CreateModule({
+        Name = "FPS Boost",
+        Flag = "FPSBoost",
+        CallingFunction = function(self, enabled: boolean)
+            self.OldENV = self.OldENV or {}
+            if enabled then
+                self.OldENV = {
+                    GlobalShadows = Lighting.GlobalShadows,
+                    Brightness = Lighting.Brightness,
+                    OutdoorAmbient = Lighting.OutdoorAmbient,
+                    Ambient = Lighting.Ambient,
+                    FogStart = Lighting.FogStart,
+                    FogEnd = Lighting.FogEnd,
+                    Effects = {},
+                    QualityLevel = settings().Rendering.QualityLevel,
+                    Terrain = Terrain and {
+                        WaterWaveSize = Terrain.WaterWaveSize,
+                        WaterWaveSpeed = Terrain.WaterWaveSpeed,
+                        WaterReflectance = Terrain.WaterReflectance,
+                        WaterTransparency = Terrain.WaterTransparency
+                    } or nil
+                }
+
+                for _, obj in next, Lighting:GetChildren() do
+                    if obj:IsA("ColorCorrectionEffect") or obj:IsA("BloomEffect") or obj:IsA("SunRaysEffect") or obj:IsA("BlurEffect") then
+                        self.OldENV.Effects[obj] = obj.Enabled
+                    end
+                    if obj:IsA("Atmosphere") or obj:IsA("Sky") then
+                        obj:Destroy()
+                    end
+                end
+
+                for _, v in next, workspace:GetDescendants() do
+                    RemoveMaterials(v)
+                end
+
+                if FPSBoostData.AutoClean then
+                    workspace.DescendantAdded:Connect(RemoveMaterials)
+                end
+
+                if FPSBoostData.LowerLighting then
+                    pcall(function()
+                        Lighting.GlobalShadows = false
+                        Lighting.Brightness = 1
+                        Lighting.OutdoorAmbient = Color3.fromRGB(130, 130, 130)
+                        Lighting.Ambient = Color3.fromRGB(120, 120, 120)
+                        Lighting.FogStart = 1
+                        Lighting.FogEnd = 100000
+                        for _, obj in next, Lighting:GetChildren() do
+                            if obj:IsA("Atmosphere") or obj:IsA("Sky") or obj:IsA("ColorCorrectionEffect")
+                            or obj:IsA("BloomEffect") or obj:IsA("SunRaysEffect") or obj:IsA("BlurEffect") then
+                                obj.Enabled = false
+                            end
+                        end
+                    end)
+                end
+
+                if FPSBoostData.RemoveTerrainEffects and Terrain then
+                    pcall(function()
+                        Terrain.WaterWaveSize = 0
+                        Terrain.WaterWaveSpeed = 0
+                        Terrain.WaterReflectance = 0
+                        Terrain.WaterTransparency = 1
+                    end)
+                end
+
+                pcall(function()
+                    settings().Rendering.QualityLevel = 1
+                end)
+            else
+                local env = self.OldENV
+                if not env then return end
+
+                pcall(function()
+                    Lighting.GlobalShadows = env.GlobalShadows
+                    Lighting.Brightness = env.Brightness
+                    Lighting.OutdoorAmbient = env.OutdoorAmbient
+                    Lighting.Ambient = env.Ambient
+                    Lighting.FogStart = env.FogStart
+                    Lighting.FogEnd = env.FogEnd
+                    for obj, was_enabled in next, env.Effects do
+                        if obj and obj:IsDescendantOf(Lighting) then
+                            obj.Enabled = was_enabled
+                        end
+                    end
+                end)
+
+                if Terrain and env.Terrain then
+                    pcall(function()
+                        Terrain.WaterWaveSize = env.Terrain.WaterWaveSize
+                        Terrain.WaterWaveSpeed = env.Terrain.WaterWaveSpeed
+                        Terrain.WaterReflectance = env.Terrain.WaterReflectance
+                        Terrain.WaterTransparency = env.Terrain.WaterTransparency
+                    end)
+                end
+
+                pcall(function()
+                    settings().Rendering.QualityLevel = env.QualityLevel
+                end)
+            end
+        end
+    })
+
+    FPSBoost:MiniToggle({
+        Name = "Particles",
+        Flag = "FPSBoostRemoveParticles",
+        Default = true,
+        CallingFunction = function(self, value)
+            FPSBoostData.RemoveParticles = value
+        end
+    })
+
+    FPSBoost:MiniToggle({
+        Name = "Trails",
+        Flag = "FPSBoostRemoveTrails",
+        Default = true,
+        CallingFunction = function(self, value)
+            FPSBoostData.RemoveTrails = value
+        end
+    })
+
+    FPSBoost:MiniToggle({
+        Name = "Smoke",
+        Flag = "FPSBoostRemoveSmoke",
+        Default = true,
+        CallingFunction = function(self, value)
+            FPSBoostData.RemoveSmoke = value
+        end
+    })
+
+    FPSBoost:MiniToggle({
+        Name = "Fire",
+        Flag = "FPSBoostRemoveFire",
+        Default = true,
+        CallingFunction = function(self, value)
+            FPSBoostData.RemoveFire = value
+        end
+    })
+
+    FPSBoost:MiniToggle({
+        Name = "Sparkles",
+        Flag = "FPSBoostRemoveSparkles",
+        Default = true,
+        CallingFunction = function(self, value)
+            FPSBoostData.RemoveSparkles = value
+        end
+    })
+
+    FPSBoost:MiniToggle({
+        Name = "Beams",
+        Flag = "FPSBoostRemoveBeams",
+        Default = true,
+        CallingFunction = function(self, value)
+            FPSBoostData.RemoveBeams = value
+        end
+    })
+
+    FPSBoost:MiniToggle({
+        Name = "Textures",
+        Flag = "FPSBoostRemoveTextures",
+        Default = true,
+        CallingFunction = function(self, value)
+            FPSBoostData.RemoveTextures = value
+        end
+    })
+
+    FPSBoost:MiniToggle({
+        Name = "Surface Appearance",
+        Flag = "FPSBoostRemoveSurfaceAppearance",
+        Default = true,
+        CallingFunction = function(self, value)
+            FPSBoostData.RemoveSurfaceAppearance = value
+        end
+    })
+
+    FPSBoost:MiniToggle({
+        Name = "Character Meshes",
+        Flag = "FPSBoostRemoveCharacterMeshes",
+        Default = true,
+        CallingFunction = function(self, value)
+            FPSBoostData.RemoveCharacterMeshes = value
+        end
+    })
+
+    FPSBoost:MiniToggle({
+        Name = "Simplify Parts",
+        Flag = "FPSBoostSimplifyParts",
+        Default = true,
+        CallingFunction = function(self, value)
+            FPSBoostData.SimplifyParts = value
+        end
+    })
+
+    FPSBoost:MiniToggle({
+        Name = "Lower Lighting",
+        Flag = "FPSBoostLowerLighting",
+        Default = true,
+        CallingFunction = function(self, value)
+            FPSBoostData.LowerLighting = value
+        end
+    })
+
+    FPSBoost:MiniToggle({
+        Name = "Terrain Effects",
+        Flag = "FPSBoostRemoveTerrainEffects",
+        Default = true,
+        CallingFunction = function(self, value)
+            FPSBoostData.RemoveTerrainEffects = value
+        end
+    })
+
+    FPSBoost:MiniToggle({
+        Name = "Auto Clean",
+        Flag = "FPSBoostAutoClean",
+        Default = true,
+        CallingFunction = function(self, value)
+            FPSBoostData.AutoClean = value
+        end
+    })
+end)();
+
+(function()
+    local TriggerBotData = {
+        ClickType = "Left",
+        CPS = 20,
+        Range = 30,
+        DistanceCheck = false
+    }
+
+    local TriggerBot
+    TriggerBot = Tabs.Combat:CreateModule({
+        Name = "Trigger Bot",
+        Flag = "TriggerBot",
+        CallingFunction = function(self, enabled: boolean)
+            if enabled then
+                local Mouse: Mouse? = LocalPlayer:GetMouse()
+                if mouse1press and mouse2press then
+                    repeat
+                        if Night:IsAlive(LocalPlayer) and Mouse and Mouse.Target and Mouse.Target.Parent and Mouse.Target.Parent:FindFirstChild("Humanoid") and Mouse.Target.Parent.Name ~= LocalPlayer.Name then
+                            local TargetRoot: BasePart? = Mouse.Target.Parent:FindFirstChild("HumanoidRootPart")
+                            local PlayerRoot: BasePart? = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+
+                            if TargetRoot and PlayerRoot then
+                                local Dist: number = (TargetRoot.Position - PlayerRoot.Position).Magnitude
+                                if TriggerBotData.DistanceCheck and Dist <= TriggerBotData.Range or not TriggerBotData.DistanceCheck then
+                                    if TriggerBotData.ClickType == "Left" then
+                                        mouse1press()
+                                    else
+                                        mouse2press()
+                                    end
+                                end
+                            end
+                        end
+                        task.wait(1 / TriggerBotData.CPS)
+                    until not self.Enabled
+                else
+                    Night:CreateNotification({
+                        Title = "Trigger Bot",
+                        Description = "Your executor doesn't support click functions.",
+                        Duration = 10
+                    })
+                    TriggerBot:SetValue(false, false, false)
+                end
+            end
+        end
+    })
+
+    TriggerBot:Dropdown({
+        Name = "Click Type",
+        Flag = "TriggerBotClickType",
+        Default = "Left",
+        Options = {"Left", "Right"},
+        CallingFunction = function(self, value: string)
+            TriggerBotData.ClickType = value
+        end
+    })
+
+    TriggerBot:Slider({
+        Name = "CPS",
+        Flag = "TriggerBotCPS",
+        Min = 1,
+        Max = 50,
+        Default = 10,
+        Increment = 1,
+        CallingFunction = function(self, value: number)
+            TriggerBotData.CPS = value
+        end
+    })
+
+    local TriggerRange
+    TriggerBot:MiniToggle({
+        Name = "Distance Check",
+        Flag = "TriggerBotCheck",
+        CallingFunction = function(self, value: boolean)
+            TriggerBotData.DistanceCheck = value
+            TriggerRange:SetVisiblity(value)
+        end
+    })
+
+    TriggerRange = TriggerBot:Slider({
+        Name = "Range",
+        Flag = "TriggerBotRange",
+        Min = 1,
+        Max = 100,
+        Default = 30,
+        Increment = 1,
+        CallingFunction = function(self, value: number)
+            TriggerBotData.Range = value
+        end
+    })
+end)();
+
+(function()
+    local Mode = "Comet"
+    local OldLighting = {
+        Ambient = Lighting.Ambient,
+        Brightness = Lighting.Brightness,
+        EnvironmentDiffuseScale = Lighting.EnvironmentDiffuseScale,
+        EnvironmentSpecularScale = Lighting.EnvironmentSpecularScale,
+        GlobalShadows = Lighting.GlobalShadows,
+        OutdoorAmbient = Lighting.OutdoorAmbient,
+        ClockTime = Lighting.ClockTime,
+        GeographicLatitude = Lighting.GeographicLatitude,
+        ExposureCompensation = Lighting.ExposureCompensation
+    }
+
+    local GameAtmosphere = Tabs.Render:CreateModule({
+        Name = "Atmosphere",
+        Flag = "Atmosphere",
+        CallingFunction = function(self, enabled: boolean)
+            if enabled then
+                for _, v in next, Lighting:GetChildren() do
+                    if v then
+                        v:Destroy()
+                    end
+                end
+
+                local Atmosphere = Instance.new("Atmosphere", Lighting)
+                local Sky = Instance.new("Sky", Lighting)
+                local Color = Instance.new("ColorCorrectionEffect", Lighting)
+
+                if Mode == "Winter" then
+                    Lighting.Ambient = Color3.fromRGB(110, 110, 110)
+                    Lighting.Brightness = 1.8
+                    Lighting.EnvironmentDiffuseScale = 0.3
+                    Lighting.EnvironmentSpecularScale = 0.1
+                    Lighting.GlobalShadows = false
+                    Lighting.OutdoorAmbient = Color3.fromRGB(150, 150, 150)
+                    Lighting.ClockTime = 15
+                    Lighting.GeographicLatitude = 40
+                    Lighting.ExposureCompensation = 0.65
+
+                    Atmosphere.Density = 0.3
+                    Atmosphere.Offset = 0.25
+                    Atmosphere.Color = Color3.fromRGB(255, 255, 255)
+
+                    Sky.SkyboxBk = "http://www.roblox.com/asset/?id=8139677359"
+                    Sky.SkyboxDn = "http://www.roblox.com/asset/?id=8139677253"
+                    Sky.SkyboxFt = "http://www.roblox.com/asset/?id=8139677111"
+                    Sky.SkyboxLf = "http://www.roblox.com/asset/?id=8139676988"
+                    Sky.SkyboxRt = "http://www.roblox.com/asset/?id=8139676842"
+                    Sky.SkyboxUp = "http://www.roblox.com/asset/?id=8139676647"
+                    Sky.SunAngularSize = 10
+
+                    Color.Brightness = 0.13
+                    Color.Contrast = 0.05
+                    Color.Saturation = -0.35
+                    Color.TintColor = Color3.fromRGB(105, 75, 170)
+                elseif Mode == "Comet" then
+                    Lighting.Ambient = Color3.fromRGB(110, 110, 110)
+                    Lighting.Brightness = 1.6
+                    Lighting.EnvironmentDiffuseScale = 0.4
+                    Lighting.EnvironmentSpecularScale = 0.7
+                    Lighting.GlobalShadows = false
+                    Lighting.OutdoorAmbient = Color3.fromRGB(150, 150, 150)
+                    Lighting.ClockTime = 14
+                    Lighting.GeographicLatitude = 35
+                    Lighting.ExposureCompensation = 0.45
+
+                    Atmosphere.Density = 0.35
+                    Atmosphere.Offset = 0.3
+                    Atmosphere.Color = Color3.fromRGB(255, 255, 255)
+
+                    Sky.SkyboxBk = "http://www.roblox.com/asset/?id=16262356578"
+                    Sky.SkyboxDn = "http://www.roblox.com/asset/?id=16262358026"
+                    Sky.SkyboxFt = "http://www.roblox.com/asset/?id=16262360469"
+                    Sky.SkyboxLf = "http://www.roblox.com/asset/?id=16262362003"
+                    Sky.SkyboxRt = "http://www.roblox.com/asset/?id=16262363873"
+                    Sky.SkyboxUp = "http://www.roblox.com/asset/?id=16262366016"
+                    Sky.SunAngularSize = 20
+
+                    Color.Brightness = 0.18
+                    Color.Contrast = 0.03
+                    Color.Saturation = -0.25
+                    Color.TintColor = Color3.fromRGB(110, 80, 180)
+                else
+                    Lighting.Ambient = Color3.fromRGB(100, 100, 100)
+                    Lighting.Brightness = 1.3
+                    Lighting.EnvironmentDiffuseScale = 0.3
+                    Lighting.EnvironmentSpecularScale = 0.5
+                    Lighting.GlobalShadows = false
+                    Lighting.OutdoorAmbient = Color3.fromRGB(150, 150, 150)
+                    Lighting.ClockTime = 15
+                    Lighting.GeographicLatitude = 35
+                    Lighting.ExposureCompensation = 0.6
+
+                    Atmosphere.Density = 0.3
+                    Atmosphere.Offset = 0.2
+                    Atmosphere.Color = Color3.fromRGB(255, 255, 255)
+
+                    Sky.SkyboxBk = "http://www.roblox.com/asset/?id=4495864450"
+                    Sky.SkyboxDn = "http://www.roblox.com/asset/?id=4495864887"
+                    Sky.SkyboxFt = "http://www.roblox.com/asset/?id=4495865458"
+                    Sky.SkyboxLf = "http://www.roblox.com/asset/?id=4495866035"
+                    Sky.SkyboxRt = "http://www.roblox.com/asset/?id=4495866584"
+                    Sky.SkyboxUp = "http://www.roblox.com/asset/?id=4495867486"
+                    Sky.SunAngularSize = 1
+
+                    Color.Brightness = 0.13
+                    Color.Contrast = 0.03
+                    Color.Saturation = -0.3
+                    Color.TintColor = Color3.fromRGB(120, 85, 200)
+                end
+            else
+                for _, v in next, Lighting:GetChildren() do
+                    if v:IsA("Atmosphere") or v:IsA("Sky") or v:IsA("ColorCorrectionEffect") then
+                        v:Destroy()
+                    end
+                end
+
+                Lighting.Ambient = OldLighting.Ambient
+                Lighting.Brightness = OldLighting.Brightness
+                Lighting.EnvironmentDiffuseScale = OldLighting.EnvironmentDiffuseScale
+                Lighting.EnvironmentSpecularScale = OldLighting.EnvironmentSpecularScale
+                Lighting.GlobalShadows = OldLighting.GlobalShadows
+                Lighting.OutdoorAmbient = OldLighting.OutdoorAmbient
+                Lighting.ClockTime = OldLighting.ClockTime
+                Lighting.GeographicLatitude = OldLighting.GeographicLatitude
+                Lighting.ExposureCompensation = OldLighting.ExposureCompensation
+            end
+        end
+    })
+
+    GameAtmosphere:Dropdown({
+        Name = "Theme",
+        Flag = "AtmosphereTheme",
+        Default = "Comet",
+        Options = {"Winter", "Comet", "Calm"},
+        CallingFunction = function(self, value: string)
+            Mode = value
         end
     })
 end)()
