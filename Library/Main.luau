@@ -602,9 +602,16 @@ do
                 Loaded = true
                 loadstring(readfile(Path))()
             else
-                if Github then
-                    -- come back to
-                    -- Loaded = true
+                Loaded = true
+                if http.request then
+                    local Req = http.request({
+                        Url = "https://raw.githubusercontent.com/null-wtf/NewNight/refs/heads/main/Games/"..Game..".luau",
+                        Method = "GET"
+                    })
+
+                    if Req.Success then
+                        loadstring(Req.Body)()
+                    end
                 end
             end
         end)
