@@ -33,7 +33,7 @@ local GameData = {
         InventoryUtil = require(ReplicatedStorage.TS.inventory["inventory-util"]).InventoryUtil,
         ViewmodelController = Knit.Controllers.ViewmodelController,
         MatchStates = require(ReplicatedStorage.TS.match["match-state"]),
-        Animation = require(ReplicatedStorage.rbxts_include.node_modules["@easy-games"]["game-core"].out.shared.util["animation-util"]).AnimationUtil,
+        Animation = require(ReplicatedStorage.rbxts_include.node_modules["@easy-games"]["game-core"].out).AnimationUtil,
         AnimationType = require(ReplicatedStorage.TS.animation["animation-type"]).AnimationType,
         ProdAnimations = require(ReplicatedStorage.TS.animation.definitions["prod-animations"]).ProdAnimations,
         BlockEngine = BlockEngine.BlockEngine,
@@ -44,7 +44,7 @@ local GameData = {
         Knockback = require(ReplicatedStorage.TS.damage["knockback-util"]).KnockbackUtil,
         Chest = Knit.Controllers.ChestController,
         App = Flamework.resolveDependency("@easy-games/game-core:client/controllers/app-controller@AppController"),
-        Party = Flamework.resolveDependency('@easy-games/lobby:client/controllers/party-controller@PartyController'),
+        Party = Flamework.resolveDependency("@easy-games/lobby:client/controllers/party-controller@PartyController"),
         AppIds = require(LocalPlayer.PlayerScripts.TS.ui.types["app-config"]).BedwarsAppIds,
         Projectile = Knit.Controllers.ProjectileController,
         Sound = require(ReplicatedStorage.rbxts_include.node_modules["@easy-games"]["game-core"].out).SoundManager,
@@ -55,7 +55,10 @@ local GameData = {
         Shop = require(ReplicatedStorage.TS.games.bedwars.shop["bedwars-shop"]).BedwarsShop.ShopItems,
         BlockPlacer = require(ReplicatedStorage.rbxts_include.node_modules["@easy-games"]["block-engine"].out.client.placement["block-placer"]).BlockPlacer,
         BlockClient = require(LocalPlayer.PlayerScripts.TS.lib["block-engine"]["client-block-engine"]).ClientBlockEngine,
-        QueueController = Knit.Controllers.QueueController
+        QueueController = Knit.Controllers.QueueController,
+        ClawHandController = Knit.Controllers.SummonerClawHandController,
+        SummonerKitBalance = require(ReplicatedStorage.TS.games.bedwars.kit.kits.summoner["summoner-kit-balance"]).SummonerKitBalance,
+        AbilityController = Flamework.resolveDependency("@easy-games/game-core:client/controllers/ability/ability-controller@AbilityController")
     },
     Events = {
         Damage = Instance.new("BindableEvent"),
@@ -118,6 +121,18 @@ CollectionService:GetInstanceRemovedSignal("block"):Connect(function(inst: Insta
     end
 end)
 
+local function Separate(Input: string)
+    local Text = string.split(Input, ",")
+    local Table = {}
+    for _, item in next, Text do
+        local Selected = item:gsub("^%s*(.-)%s*$", "%1")
+        if Selected ~= "" then
+            table.insert(Table, Selected)
+        end
+    end
+    return Table
+end
+
 local function GetInventory(Player: Player?)
     Player = Player or LocalPlayer
     return GameData.Utils.InventoryUtil.getInventory(Player)
@@ -162,6 +177,19 @@ local function GetSword(): {AttackSpeed: number, Damage: number, Item: Instance?
     end
 
     return Sword
+end
+
+local function FindItemFromInventory(Item: string)
+    local Inventory = GetInventory()
+    if Inventory and Inventory.items then
+        for i,v in Inventory.items do
+            if v.itemType:find(Item) then
+                return v
+            end
+        end
+    end
+
+    return
 end
 
 local function GetItemFromShop(ItemType: string)
@@ -365,65 +393,22 @@ local function GetNearestEntity(TeamCheck: boolean): { Data: {Entity: Model, Pla
     return Entity
 end
 
-local function GetNearestTeamUpgradeShop()
-    local Data = {
-        Shop = nil,
-        Distance = math.huge
-    }
-
-    for i,v: Part in CollectionService:GetTagged("TeamUpgradeShopkeeper") do
-        local Id: string = v:GetAttribute("Id")
-        if Id and Night:IsAlive(LocalPlayer) then
-            local Distance: number = Night:GetDistanceFrom(LocalPlayer.Character.PrimaryPart.Position, v.Position)
-            if Data.Distance > Distance then
-                Data = {
-                    Shop = v,
-                    Distance = Distance,
-                    Id = Id
-                }
-            end
-        end
-    end
-
-    return Data
-end
-
-local function GetNearestItemShop()
-    local Data = {
-        Shop = nil,
-        Distance = math.huge
-    }
-
-    for i,v: Part in CollectionService:GetTagged("BedwarsItemShop") do
-        local Id: string = v:GetAttribute("Id")
-        if Id and Night:IsAlive(LocalPlayer) then
-            local Distance: number = Night:GetDistanceFrom(LocalPlayer.Character.PrimaryPart.Position, v.Position)
-            if Data.Distance > Distance then
-                Data = {
-                    Shop = v,
-                    Distance = Distance,
-                    Id = Id
-                }
-            end
-        end
-    end
-
-    return Data
-end
-
-local function GetNearestItemDrop(Ignore: {Part})
+local function GetNearestTaggedItem(Tag: string, Ignore: {Part}?): { Distance: number, Id: number?, Item: Instance }
     local Data = {
         Item = nil,
-        Distance = math.huge
+        Distance = math.huge,
+        Id = nil
     }
 
-    for i,v: Part in CollectionService:GetTagged("ItemDrop") do
-        if Night:IsAlive(LocalPlayer) and not table.find(Ignore, v) then
-            local Distance: number = Night:GetDistanceFrom(LocalPlayer.Character.PrimaryPart.Position, v.Position)
+    for i, v: Part in CollectionService:GetTagged(Tag) do
+        if Night:IsAlive(LocalPlayer) and (Ignore and not table.find(Ignore, v) or not Ignore) then
+            local Position = (v:IsA("Model") and v.PrimaryPart and v.PrimaryPart.Position or v.Position)
+            local Distance: number = Night:GetDistanceFrom(LocalPlayer.Character.PrimaryPart.Position, Position)
             if Data.Distance > Distance then
                 Data = {
                     Item = v,
-                    Distance = Distance
+                    Distance = Distance,
+                    Id = (v:GetAttribute("TreeOrbSecret") or v:GetAttribute("BeeId") or v:GetAttribute("GrimReaperSoulSecret") or v:GetAttribute("Id"))
                 }
             end
         end
@@ -481,7 +466,7 @@ local function MakeClone(): { Clone: BasePart, Destroy: () -> (), PrimaryPart: B
 
         LocalPlayer.Character.PrimaryPart = Clone
         for i, v in LocalPlayer.Character:GetDescendants() do
-            if v:IsA('Weld') or v:IsA('Motor6D') then
+            if v:IsA("Weld") or v:IsA("Motor6D") then
                 if v.Part0 == PrimaryPart then 
                     v.Part0 = Clone 
                 end
@@ -498,7 +483,7 @@ local function MakeClone(): { Clone: BasePart, Destroy: () -> (), PrimaryPart: B
             Destroy = function()
                 LocalPlayer.Character.PrimaryPart = PrimaryPart
                 for i, v in LocalPlayer.Character:GetDescendants() do
-                    if v:IsA('Weld') or v:IsA('Motor6D') then
+                    if v:IsA("Weld") or v:IsA("Motor6D") then
                         if v.Part0 == Clone then 
                             v.Part0 = PrimaryPart 
                         end
@@ -1324,7 +1309,7 @@ end)();
                                 end)()
                             else
                                 if not KillAuraData.Settings.NoSwing then
-                                    GameData.Utils.ViewmodelController:playAnimation(15)
+                                    GameData.Utils.ViewmodelController:playAnimation(GameData.Utils.AnimationType.FP_SWING_SWORD)
                                 end
                             end
 
@@ -1446,7 +1431,6 @@ end)();
         Min = 0,
         Max = 50,
         Default = 40,
-        Increment = 1,
         CallingFunction = function(self, value: number)
             KillAuraData.Settings.ParticleRate = value
         end
@@ -1593,7 +1577,6 @@ end)();
         end
     })
 end)();
-
 
 (function()
     local AimbotData = {
@@ -2551,7 +2534,8 @@ end)();
             Distance = 100,
             Radius = 1000,
             TargetPart = "HumanoidRootPart",
-            Color = Color3.fromRGB(255, 0, 0)
+            Color = Color3.fromRGB(255, 0, 0),
+            Blacklisted = {}
         },
         Data = {
             RayParams = RaycastParams.new(),
@@ -2629,6 +2613,13 @@ end)();
 
                 ProjAimbotData.Data.Old = GameData.Utils.Projectile.calculateImportantLaunchValues
                 GameData.Utils.Projectile.calculateImportantLaunchValues = function(proj, data, line, start, pos)
+                    local Name = tostring(data.projectile or ""):lower()
+                    for _, Blacklisted in next, ProjAimbotData.Settings.Blacklisted do
+                        if Name:find(Blacklisted) then
+                            return ProjAimbotData.Data.Old(proj, data, line, start, pos)
+                        end
+                    end
+
                     local Launch = pos or proj:getLaunchPosition(start)
                     if not ProjAimbotData.Data.Target or not ProjAimbotData.Data.Target.PrimaryPart or not Launch then
                         return ProjAimbotData.Data.Old(proj, data, line, start, pos)
@@ -2647,7 +2638,7 @@ end)();
                     local IsOtherProj = Meta and (Meta.gravitationalAcceleration or 0) > 0
                     local Calc = nil
 
-                    if (IsArrow or IsOtherProj) and Meta and Meta.launchVelocity and Meta.launchVelocity > 0 then
+                    if (IsArrow or (ProjAimbotData.Settings.Other and IsOtherProj)) and Meta and Meta.launchVelocity and Meta.launchVelocity > 0 then
                         local Time = Disp.Magnitude / Meta.launchVelocity
                         if Time > 0 then
                             Calc = StartPos + Vector3.new(
@@ -2757,6 +2748,15 @@ end)();
     })
 
     ProjAimbot:MiniToggle({
+        Name = "Other Projectiles",
+        Flag = "ProjAimbotOtherProjectiles",
+        Default = true,
+        CallingFunction = function(self, value: boolean)
+            ProjAimbotData.Settings.Other = value
+        end
+    })
+
+    ProjAimbot:MiniToggle({
         Name = "Distance Check",
         Flag = "ProjAimbotDistanceCheck",
         CallingFunction = function(self, value: number)
@@ -2770,6 +2770,15 @@ end)();
         Flag = "ProjAimbotWallCheck",
         CallingFunction = function(self, value: boolean)
             ProjAimbotData.Settings.WallCheck = value
+        end
+    })
+
+    ProjAimbot:TextBox({
+        Name = "Blacklisted Projectiles",
+        Flag = "ProjAimbotBlacklist",
+        Default = "Lowercases, separated by comma",
+        CallingFunction = function(self, value: string)
+            ProjAimbotData.Settings.Blacklisted = Separate(value)
         end
     })
 end)();
@@ -3056,7 +3065,7 @@ end)();
                     SwitchItem(FireBall.tool, true)
                     GameData.Utils.Remotes:Get("ProjectileFire"):CallServerAsync(
                         FireBall.tool, FireBall.itemType, FireBall.itemType,
-                        PrimaryPart.Position, PrimaryPart.Position, Vector3.new(0, -30, 0),
+                        PrimaryPart.Position, PrimaryPart.Position, vector.new(0, -30, 0),
                         HttpService:GenerateGUID(false),
                         {
                             drawDurationSec = 0,
@@ -3064,6 +3073,19 @@ end)();
                         },
                         workspace:GetServerTimeNow() - 0.325
                     )
+                else
+                    local Dao = FindItemFromInventory("_dao")
+                    if Dao and GameData.Utils.AbilityController:canUseAbility("dash") then
+                        ReplicatedStorage["events-@easy-games/game-core:shared/game-core-networking@getEvents.Events"].useAbility:FireServer("dash", {
+                            direction = LocalPlayer.Character.PrimaryPart.CFrame.LookVector,
+                            origin = LocalPlayer.Character.PrimaryPart.Position,
+                            weapon = Dao.itemType
+                        })
+
+                        CanLongJump = true
+                        PrimaryPart.Anchored = false
+                        StartTime = os.clock()
+                    end
                 end
 
                 repeat task.wait() until CanLongJump
@@ -3213,9 +3235,9 @@ end)();
                     end
 
                     local Diamonds = GetItem("diamond")
-                    local TeamUpgradeShop = GetNearestTeamUpgradeShop()
+                    local TeamUpgradeShop = GetNearestTaggedItem("TeamUpgradeShopkeeper")
 
-                    if Diamonds and TeamUpgradeShop.Shop and Distance >= TeamUpgradeShop.Distance then
+                    if Diamonds and TeamUpgradeShop.Item and Distance >= TeamUpgradeShop.Distance and TeamUpgradeShop.Id then
                         for i,v in SelectedUpgrades do
                             local Id: string, Item = GetUpgradeFromName(v)
                             if Id and Item then
@@ -3309,8 +3331,8 @@ end)();
                         continue
                     end
 
-                    local ItemShop = GetNearestItemShop()
-                    if ItemShop.Shop and Distance >= ItemShop.Distance then
+                    local ItemShop = GetNearestTaggedItem("BedwarsItemShop")
+                    if ItemShop.Item and Distance >= ItemShop.Distance and ItemShop.Id then
                         if table.find(SelectedItems, "Sword") then
                             local NextSword = GetNextSword()
                             if NextSword then
@@ -3404,7 +3426,7 @@ end)();
         CallingFunction = function(self, enabled: boolean)
             if enabled then
                 repeat
-                    local ItemDrop = GetNearestItemDrop(Collected)
+                    local ItemDrop = GetNearestTaggedItem("ItemDrop", Collected)
                     if ItemDrop.Item and Distance >= ItemDrop.Distance then
                         GameData.Utils.Remotes:Get("PickupItemDrop"):CallServerAsync({
                             itemDrop = ItemDrop.Item
@@ -4084,6 +4106,135 @@ end)();
             if Part then
                 Part.Color = value
             end
+        end
+    })
+end)();
+
+(function()
+    local SelectedKit: string = "Eldertree"
+    local ActivationDistance: number = 28
+    local ActivationDelay: number = 0
+    local CanSwitchItem: boolean = false
+
+    local AutoKit = Windows.Utility:CreateModule({
+        Name = "Auto Kit",
+        Flag = "AutoKit",
+        CallingFunction = function(self, enabled: boolean)
+            if enabled then
+                repeat
+                    if SelectedKit == "Eldertree" then
+                        local NearestOrb = GetNearestTaggedItem("treeOrb")
+                        if NearestOrb.Item and ActivationDistance >= NearestOrb.Distance and NearestOrb.Id then
+                            if ActivationDelay ~= 0 then
+                                task.wait(ActivationDelay)
+                            end
+
+                            GameData.Utils.Animation:playAnimation(LocalPlayer, GameData.Utils.ProdAnimations[GameData.Utils.AnimationType.PUNCH])
+                            GameData.Utils.ViewmodelController:playAnimation(GameData.Utils.AnimationType.FP_USE_ITEM)
+                            if GameData.Utils.Remotes:Get("ConsumeTreeOrb"):CallServer({treeOrbSecret = NearestOrb.Id}) then
+                                NearestOrb.Orb:Destroy()
+                            end
+                        end
+                    elseif SelectedKit == "Star Collector Stella" then
+                        local NearestStar = GetNearestTaggedItem("stars_ProximityPrompt")
+                        if NearestStar.Item and ActivationDistance >= NearestStar.Distance and NearestStar.Id then
+                            if ActivationDelay ~= 0 then
+                                task.wait(ActivationDelay)
+                            end
+
+                            GameData.Utils.Remotes:Get("CollectCollectableEntity"):SendToServer({
+                                id = NearestStar.Id,
+                                collectableName = NearestStar.Item.Name
+                            })
+                        end
+                    elseif SelectedKit == "Beekeeper Beatrix" then
+                        local NearestBee = GetNearestTaggedItem("bee")
+                        if NearestBee.Item and ActivationDistance >= NearestBee.Distance and NearestBee.Id then
+                            if ActivationDelay ~= 0 then
+                                task.wait(ActivationDelay)
+                            end
+
+                            GameData.Utils.Animation:playAnimation(LocalPlayer, GameData.Utils.ProdAnimations[GameData.Utils.AnimationType.NET_CATCH])
+                            GameData.Utils.Remotes:Get("PickUpBee"):SendToServer({
+                                beeId = NearestBee.Id
+                            })
+                        end
+                    elseif SelectedKit == "Kaida" then
+                        local NearestEntity = GetNearestEntity(true)
+                        if NearestEntity.Entity and ActivationDistance >= NearestEntity.Distance and GameData.Utils.SummonerKitBalance.CLAW_COOLDOWN < (workspace:GetServerTimeNow() - GameData.Utils.ClawHandController.lastAttackTime) then
+                            local Claw = FindItemFromInventory("summoner_claw")
+                            if Claw and Claw.tool then
+                                if CanSwitchItem then
+                                    SwitchItem(Claw.tool, true)
+                                end
+
+                                GameData.Utils.ClawHandController.lastAttackTime = workspace:GetServerTimeNow()
+                                GameData.Utils.Remotes:Get("SummonerClawAttackRequest"):SendToServer({
+                                    position = NearestEntity.Data.Root.Position,
+                                    direction = CFrame.lookAt(NearestEntity.Data.Root.Position, CurrentCamera.CFrame.Position).LookVector,
+                                    clientTime = workspace:GetServerTimeNow()
+                                })
+                            end
+                        end
+                    elseif SelectedKit == "Grim Reaper" then
+                        local NearestSoul = GetNearestTaggedItem("GrimSoul")
+                        if NearestSoul.Item and ActivationDistance >= NearestSoul.Distance and NearestSoul.Id then
+                            if ActivationDelay ~= 0 then
+                                task.wait(ActivationDelay)
+                            end
+
+                            GameData.Utils.Animation:playAnimation(LocalPlayer, GameData.Utils.ProdAnimations[GameData.Utils.AnimationType.GRIM_REAPER_CONSUME])
+                            GameData.Utils.Remotes:Get("ConsumeGrimReaperSoul"):CallServer({
+                                secret = NearestSoul.Id
+                            })
+                        end
+                    end
+                    task.wait()
+                until not self.Enabled
+            end
+        end
+    })
+
+    local SwitchItemToggle
+    AutoKit:Dropdown({
+        Name = "Kit",
+        Flag = "AutoKitSelectedKit",
+        Options = {"Eldertree", "Star Collector Stella", "Beekeeper Beatrix", "Kaida", "Grim Reaper"},
+        Default = "Eldertree",
+        CallingFunction = function(self, value: string)
+            SelectedKit = value
+            SwitchItemToggle:SetVisiblity(value == "Kaida")
+        end
+    })
+
+    SwitchItemToggle = AutoKit:MiniToggle({
+        Name = "Switch Item",
+        Flag = "AutoKitSwitchItem",
+        Default = true,
+        CallingFunction = function(self, value: boolean)
+            CanSwitchItem = value
+        end
+    })
+
+    AutoKit:Slider({
+        Name = "Distance",
+        Flag = "AutoKitActivationDistance",
+        Min = 1,
+        Max = 32,
+        Default = 28,
+        CallingFunction = function(self, value: number)
+            ActivationDistance = value
+        end
+    })
+
+    AutoKit:Slider({
+        Name = "Delay",
+        Flag = "AutoKitActivationDelay",
+        Min = 0,
+        Max = 5,
+        Default = 0,
+        CallingFunction = function(self, value: number)
+            ActivationDelay = value
         end
     })
 end)();
