@@ -20,7 +20,7 @@ local Camera: Camera = workspace.CurrentCamera
 local BaseGit: string = "https://github.com/null-wtf/NewNight"
 local NightInit: {[any]: any} = getgenv().NightInit or {}
 local Night = {
-    Version = "3.01",
+    Version = "3.02",
     BaseGit = BaseGit,
     Scale = 0.9,
     Keybind = Enum.KeyCode.RightShift,
@@ -218,4 +218,5 @@ Night:CreateNotification({
     Description = Night.Load.LoadTips[math.random(1, #Night.Load.LoadTips)],
     Duration = 3
 })
+
 
