@@ -4595,7 +4595,7 @@ end)();
 
                 self:Connection(GameData.Events.MatchEnd.Event:Connect(function(Value)
                     if AutoToxicData.Win and Value.TeamID == GameData.Utils.Store:getState().Game.myTeam.id then
-                        TextChatService.TextChannels.RBXGeneral:SendAsync(Messages.Bed[math.random(1, #Messages.Win)])
+                        TextChatService.TextChannels.RBXGeneral:SendAsync(Messages.Win[math.random(1, #Messages.Win)])
                     end
                 end))
             end
