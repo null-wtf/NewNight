@@ -133,6 +133,12 @@ task.spawn(function()
     end))
 
     Assets.Connections:Add(GameData.Utils.Remotes:Get("MatchEndEvent"):Connect(function(Data)
+        if Windows.Utility.Modules.AntiAFK and Windows.Utility.Modules.AntiAFK.Enabled then
+            GameData.Utils.Remotes:Get("AfkInfo"):SendToServer({
+                afk = false
+            })
+        end
+
         GameData.Events.MatchEnd:Fire({
             TeamID = Data.winningTeamId,
             OldLeaderboard = Data.previousLeaderboardPosition,
