@@ -4019,7 +4019,7 @@ end)();
                 end
 
                 for _, v in getconnections(RunService.Heartbeat) do
-                    if v.Function and typeof(v.Function) == "function" and v.Enabled then
+                    if v.Function and typeof(v.Function) == "function" then
                         local Constants = debug.getconstants(v.Function)
                         if #Constants > 0 and table.find(Constants, "AfkInfo") then
                             v:Disable()
@@ -4028,9 +4028,12 @@ end)();
                     end
                 end
 
-                GameData.Utils.Remotes:Get("AfkInfo"):SendToServer({
-                    afk = false
-                })
+                repeat
+                    GameData.Utils.Remotes:Get("AfkInfo"):SendToServer({
+                        afk = false
+                    })
+                    task.wait(3)
+                until not self.Enabled
             else
                 for i,v in Restore do
                     v:Enable()
@@ -4058,7 +4061,7 @@ end)();
                     end
                 end))
 
-                self:Connection(GameData.Utils.Remotes:Get("MatchEndEvent"):Connect(function()
+                self:Connection(GameData.Events.MatchEnd.Event:Connect(function()
                     if not Sent then
                         Sent = true
                         task.delay(Delay, GameData.Utils.QueueController.joinQueue, GameData.Utils.QueueController, GameData.Utils.Store:getState().Game.queueType)
@@ -4714,7 +4717,7 @@ end)();
                                     for _, v in AutoVoidDropData.Settings.Items do
                                         local Item = GetItem(v)
                                         if Item then
-                                            ReplicatedStorage.rbxts_include.node_modules["@rbxts"].net.out._NetManaged.DropItem:InvokeServer({
+                                            GameData.Utils.Remotes:Get("DropItem"):CallServerAsync({
                                                 item = Item.tool,
                                                 amount = Item.amount
                                             })
