@@ -76,6 +76,11 @@ local GameData = {
     }
 }
 
+local Materials = {}
+for _, Material in next, Enum.Material:GetEnumItems() do
+    table.insert(Materials, Material.Name)
+end
+
 local AimParts: {string} = {"HumanoidRootPart", "Head"}
 if LocalPlayer.Character then
     for _, v in LocalPlayer.Character:GetChildren() do
@@ -4208,6 +4213,16 @@ end
             for _, v in next, AntiVoidLaunch do v:SetVisiblity(value == "Launch") end
             for _, v in next, AntiVoidTP do v:SetVisiblity(value == "Teleport") end
             JumpSlider:SetVisiblity(value == "Jump")
+        end
+    })
+
+    AntiVoid:Dropdown({
+        Name = "Material",
+        Flag = "AntiVoidMaterial",
+        Options = Materials,
+        Default = "Air",
+        CallingFunction = function(self, value: string)
+            AntiVoidData.Material = value
         end
     })
 
