@@ -2375,10 +2375,10 @@ end)();
 
         local Weld = Instance.new("WeldConstraint")
         Weld.Part0 = Mesh
-        Weld.Part1 = LocalPlayer.Character.Head
+        pcall(function() Weld.Part1 = LocalPlayer.Character.Head end)
         Weld.Parent = Mesh
 
-        Mesh.CFrame = LocalPlayer.Character.Head.CFrame * CFrame.new(0, 1, 0)
+        pcall(function() Mesh.CFrame = LocalPlayer.Character.Head.CFrame * CFrame.new(0, 1, 0) end)
         Mesh.Parent = LocalPlayer.Character
 
         ChinaHatData.Data.Mesh = Mesh
@@ -2776,8 +2776,7 @@ end)();
                         Lighting.FogStart = 1
                         Lighting.FogEnd = 100000
                         for _, obj in next, Lighting:GetChildren() do
-                            if obj:IsA("Atmosphere") or obj:IsA("Sky") or obj:IsA("ColorCorrectionEffect")
-                            or obj:IsA("BloomEffect") or obj:IsA("SunRaysEffect") or obj:IsA("BlurEffect") then
+                            if obj:IsA("Atmosphere") or obj:IsA("Sky") or obj:IsA("ColorCorrectionEffect") or obj:IsA("BloomEffect") or obj:IsA("SunRaysEffect") or obj:IsA("BlurEffect") then
                                 obj.Enabled = false
                             end
                         end
@@ -2802,14 +2801,14 @@ end)();
 
                 pcall(function()
                     Lighting.GlobalShadows = env.GlobalShadows
-                    Lighting.Brightness = (env.Brightness or 0)
+                    Lighting.Brightness = env.Brightness or 0
                     Lighting.OutdoorAmbient = env.OutdoorAmbient
                     Lighting.Ambient = env.Ambient
                     Lighting.FogStart = env.FogStart
                     Lighting.FogEnd = env.FogEnd
-                    for obj, was_enabled in next, env.Effects do
+                    for obj, enabled in next, env.Effects do
                         if obj and obj:IsDescendantOf(Lighting) then
-                            obj.Enabled = was_enabled
+                            obj.Enabled = enabled
                         end
                     end
                 end)
@@ -3040,7 +3039,8 @@ end)();
 end)();
 
 (function()
-    local Mode = "Comet"
+    local Mode: string = "Comet"
+
     local OldLighting = {
         Ambient = Lighting.Ambient,
         Brightness = Lighting.Brightness,
@@ -3051,6 +3051,23 @@ end)();
         ClockTime = Lighting.ClockTime,
         GeographicLatitude = Lighting.GeographicLatitude,
         ExposureCompensation = Lighting.ExposureCompensation
+    }
+
+    local Settings = {
+        AmbientColor = Color3.fromRGB(100, 100, 100),
+        Brightness = 1.5,
+        Time = 14,
+        Density = 0.5,
+        CCColor = Color3.fromRGB(255, 255, 255),
+        CCBrightness = 0.15,
+        CCContrast = 0.03,
+        CCSaturation = -0.3,
+        SkyboxBk = "Skybox Back ID",
+        SkyboxDn = "Skybox Down ID",
+        SkyboxFt = "Skybox Front ID",
+        SkyboxLf = "Skybox Left ID",
+        SkyboxRt = "Skybox Right ID",
+        SkyboxUp = "Skybox Up ID"
     }
 
     local GameAtmosphere = Tabs.Render:CreateModule({
@@ -3122,7 +3139,7 @@ end)();
                     Color.Contrast = 0.03
                     Color.Saturation = -0.25
                     Color.TintColor = Color3.fromRGB(110, 80, 180)
-                else
+                elseif Mode == "Calm" then
                     Lighting.Ambient = Color3.fromRGB(100, 100, 100)
                     Lighting.Brightness = 1.3
                     Lighting.EnvironmentDiffuseScale = 0.3
@@ -3149,6 +3166,25 @@ end)();
                     Color.Contrast = 0.03
                     Color.Saturation = -0.3
                     Color.TintColor = Color3.fromRGB(120, 85, 200)
+                else
+                    Lighting.Ambient = Settings.AmbientColor
+                    Lighting.Brightness = Settings.Brightness
+                    Lighting.ClockTime = Settings.Time
+
+                    Sky.SkyboxBk = "http://www.roblox.com/asset/?id=" .. Settings.SkyboxBk
+                    Sky.SkyboxDn = "http://www.roblox.com/asset/?id=" .. Settings.SkyboxDn
+                    Sky.SkyboxFt = "http://www.roblox.com/asset/?id=" .. Settings.SkyboxFt
+                    Sky.SkyboxLf = "http://www.roblox.com/asset/?id=" .. Settings.SkyboxLf
+                    Sky.SkyboxRt = "http://www.roblox.com/asset/?id=" .. Settings.SkyboxRt
+                    Sky.SkyboxUp = "http://www.roblox.com/asset/?id=" .. Settings.SkyboxUp
+
+                    Atmosphere.Density = Settings.Density
+                    Atmosphere.Color = Color3.fromRGB(255, 255, 255)
+
+                    Color.Brightness = Settings.CCBrightness
+                    Color.Contrast = Settings.CCContrast
+                    Color.Saturation = -Settings.CCSaturation
+                    Color.TintColor = Settings.CCColor
                 end
             else
                 for _, v in next, Lighting:GetChildren() do
@@ -3170,13 +3206,161 @@ end)();
         end
     })
 
+    local Custom = {}
     GameAtmosphere:Dropdown({
         Name = "Theme",
         Flag = "AtmosphereTheme",
         Default = "Comet",
-        Options = {"Winter", "Comet", "Calm"},
+        Options = {"Winter", "Comet", "Calm", "Custom"},
         CallingFunction = function(self, value: string)
             Mode = value
+            for _, v in next, Custom do
+                v:SetVisiblity(value == "Custom")
+            end
         end
     })
+
+    table.insert(Custom, GameAtmosphere:ColorSlider({
+        Name = "Ambient Color",
+        Flag = "AtmosphereAmbient",
+        Default = Color3.fromRGB(100, 100, 100),
+        CallingFunction = function(self, Color: Color3)
+            Settings.AmbientColor = Color
+        end
+    }))
+
+    table.insert(Custom, GameAtmosphere:Slider({
+        Name = "Brightness",
+        Flag = "AtmosphereBrightness",
+        Min = 0,
+        Max = 5,
+        Default = 1.5,
+        Increment = 0.01,
+        CallingFunction = function(self, value: number)
+            Settings.Brightness = value
+        end
+    }))
+
+    table.insert(Custom, GameAtmosphere:Slider({
+        Name = "Time",
+        Flag = "AtmosphereTime",
+        Min = 1,
+        Max = 24,
+        Default = 14,
+        Increment = 0.1,
+        CallingFunction = function(self, value: number)
+            Settings.Time = value
+        end
+    }))
+
+    table.insert(Custom, GameAtmosphere:Slider({
+        Name = "ATMSPH Density",
+        Flag = "AtmosphereDensity",
+        Min = 0,
+        Max = 2,
+        Default = 0.5,
+        Increment = 0.01,
+        CallingFunction = function(self, value: number)
+            Settings.Density = value
+        end
+    }))
+
+    table.insert(Custom, GameAtmosphere:ColorSlider({
+        Name = "CC Color",
+        Flag = "AtmosphereCCColor",
+        Default = Color3.fromRGB(255, 255, 255),
+        CallingFunction = function(self, Color: Color3)
+            Settings.CCColor = Color
+        end
+    }))
+
+    table.insert(Custom, GameAtmosphere:Slider({
+        Name = "CC Brightness",
+        Flag = "AtmosphereCCBrightness",
+        Min = 0,
+        Max = 0.5,
+        Default = 0.15,
+        Increment = 0.01,
+        CallingFunction = function(self, value: number)
+            Settings.CCBrightness = value
+        end
+    }))
+
+    table.insert(Custom, GameAtmosphere:Slider({
+        Name = "CC Contrast",
+        Flag = "AtmosphereCCContrast",
+        Min = 1,
+        Max = 0.1,
+        Default = 0.03,
+        Increment = 0.01,
+        CallingFunction = function(self, value: number)
+            Settings.CCContrast = value
+        end
+    }))
+
+    table.insert(Custom, GameAtmosphere:Slider({
+        Name = "CC Saturation",
+        Flag = "AtmosphereCCSaturation",
+        Min = -2,
+        Max = 2,
+        Default = -0.3,
+        Increment = 0.01,
+        CallingFunction = function(self, value: number)
+            Settings.CCSaturation = value
+        end
+    }))
+
+    table.insert(Custom, GameAtmosphere:TextBox({
+        Name = "Skybox Back ID",
+        Flag = "AtmosphereSkyboxBk",
+        Default = "Skybox Back ID",
+        CallingFunction = function(self, value: string)
+            Settings.SkyboxBk = value
+        end
+    }))
+
+    table.insert(Custom, GameAtmosphere:TextBox({
+        Name = "Skybox Down ID",
+        Flag = "AtmosphereSkyboxDn",
+        Default = "Skybox Down ID",
+        CallingFunction = function(self, value: string)
+            Settings.SkyboxDn = value
+        end
+    }))
+
+    table.insert(Custom, GameAtmosphere:TextBox({
+        Name = "Skybox Front ID",
+        Flag = "AtmosphereSkyboxFt",
+        Default = "Skybox Front ID",
+        CallingFunction = function(self, value: string)
+            Settings.SkyboxFt = value
+        end
+    }))
+
+    table.insert(Custom, GameAtmosphere:TextBox({
+        Name = "Skybox Left ID",
+        Flag = "AtmosphereSkyboxLf",
+        Default = "Skybox Left ID",
+        CallingFunction = function(self, value: string)
+            Settings.SkyboxLf = value
+        end
+    }))
+
+    table.insert(Custom, GameAtmosphere:TextBox({
+        Name = "Skybox Right ID",
+        Flag = "AtmosphereSkyboxRt",
+        Default = "Skybox Right ID",
+        CallingFunction = function(self, value: string)
+            Settings.SkyboxRt = value
+        end
+    }))
+
+    table.insert(Custom, GameAtmosphere:TextBox({
+        Name = "Skybox Up ID",
+        Flag = "AtmosphereSkyboxUp",
+        Default = "Skybox Up ID",
+        CallingFunction = function(self, value: string)
+            Settings.SkyboxUp = value
+        end
+    }))
 end)()
