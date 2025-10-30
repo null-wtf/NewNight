@@ -15,7 +15,7 @@ local Stats: Stats = Night.cloneref(game:GetService("Stats")):FindFirstChild("Pe
 local TextChatService: TextChatService = Night.cloneref(game:GetService("TextChatService"))
 
 local LocalPlayer: Player = Players.LocalPlayer
-local PlayerGui: PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+local PlayerGui: PlayerGui = Night.cloneref(LocalPlayer:WaitForChild("PlayerGui"))
 local CurrentCamera: Camera = workspace.CurrentCamera
 
 local Knit = require(ReplicatedStorage.rbxts_include.node_modules["@easy-games"].knit.src).KnitClient
@@ -216,19 +216,6 @@ local function GetSword(): {AttackSpeed: number, Damage: number, Item: Instance?
     return Sword
 end
 
-local function FindItemFromInventory(Item: string)
-    local Inventory = GetInventory()
-    if Inventory and Inventory.items then
-        for i,v in Inventory.items do
-            if v.itemType:find(Item) then
-                return v
-            end
-        end
-    end
-
-    return
-end
-
 local function GetItemFromShop(ItemType: string)
     for i,v in GameData.Utils.Shop do
         if v.itemType == ItemType then
@@ -283,9 +270,9 @@ local function GetNextArmor()
     return GetItemFromShop("leather_chestplate"), nil, "leather_chestplate"
 end
 
-local function GetItem(Name: string)
+local function GetItem(Name: string, Find: boolean?)
     for i, v in GetInventory().items do
-		if v.itemType == Name then
+		if v.itemType == Name or (Find and v.itemType:find(Name)) then
 			return v
 		end
 	end
@@ -364,27 +351,76 @@ local function GetBlocks()
 end
 
 local function SwitchItem(Item: Instance, SwitchBack: boolean)
-    local SetInvItem = GameData.Utils.Remotes:Get("SetInvItem")
-    local Inventory = GetInventory()
-    local CurrentItem = nil
-    if Inventory and Inventory.hand then
-        CurrentItem = Inventory.hand.tool
-        if CurrentItem == Item then
-            return
+    if not Item then
+        return
+    end
+
+    local CurrentItem: ObjectValue? = LocalPlayer.Character:FindFirstChild("HandInvItem")
+    if CurrentItem and CurrentItem:IsA("ObjectValue") then
+        CurrentItem = CurrentItem.Value
+    else
+        local Inventory = GetInventory()
+        if Inventory and Inventory.hand then
+            CurrentItem = Inventory.hand.tool
         end
     end
 
-    local Completed: boolean = false
-    SetInvItem:CallServerAsync({
-        hand = Item
-    }):andThen(function(suc: boolean)
-        if CurrentItem and suc then
-            Completed = true
-        end
-    end)
+    if CurrentItem == Item then
+        return
+    end
 
-    repeat task.wait() until Completed
+    local Found: boolean = false
+    for i,v in GameData.Utils.Store:getState().Inventory.observedInventory.hotbar do
+        if v.item and v.item.tool and v.item.tool == Item then
+            Found = true
+            GameData.Utils.Store:dispatch({
+                type = "InventorySelectHotbarSlot",
+                slot = (i - 1)
+            })
+        end
+    end
+
+    if not Found then
+        local Completed: boolean = false
+        GameData.Utils.Remotes:Get("SetInvItem"):CallServerAsync({
+            hand = Item
+        }):andThen(function(suc: boolean)
+            if suc then
+                Completed = true
+                if SwitchBack and CurrentItem then
+                    task.delay(0.1, SwitchItem, CurrentItem)
+                end
+            end
+        end)
+
+        repeat task.wait() until Completed
+    else
+        local CompTime: number = os.clock()
+        repeat 
+            local HandItem = LocalPlayer.Character:FindFirstChild("HandInvItem")
+            if HandItem and HandItem:IsA("ObjectValue") then
+                HandItem = HandItem.Value
+            else
+                local Inventory = GetInventory()
+                if Inventory and Inventory.hand then
+                    HandItem = Inventory.hand.tool
+                end
+            end
+
+            if HandItem == Item then
+                break
+            end
+
+            task.wait() 
+        until false or (os.clock() - CompTime) > 0.5
+
+        task.wait(0.025)
+        if SwitchBack then
+            task.delay(0.1, SwitchItem, CurrentItem)
+        end
+    end
 end
+
 
 local function GetEntities(): {{Entity: Model, Player: Player?, Health: number, MaxHealth: number, Humanoid: Humanoid, Root: BasePart, Type: string}}
     local Entities = {}
@@ -486,7 +522,7 @@ local function GetSpeedMultiplier(): number
     local Multiplier: number = 0
     for i,v in GameData.Utils.Sprint:getMovementStatusModifier().modifiers do
         if typeof(i) == "table" and i.moveSpeedMultiplier and v then
-            Multiplier += i.moveSpeedMultiplier            
+            Multiplier += (i.moveSpeedMultiplier - 0.05)
         end
     end
     return Multiplier
@@ -519,7 +555,7 @@ local function MakeClone(): { Clone: BasePart, Destroy: () -> (), PrimaryPart: B
             PrimaryPart = PrimaryPart,
             Destroy = function()
                 LocalPlayer.Character.PrimaryPart = PrimaryPart
-                for i, v in LocalPlayer.Character:GetDescendants() do
+                for _, v in LocalPlayer.Character:GetDescendants() do
                     if v:IsA("Weld") or v:IsA("Motor6D") then
                         if v.Part0 == Clone then 
                             v.Part0 = PrimaryPart 
@@ -773,7 +809,7 @@ Windows.Movement.Modules.UniversalNoClip:Destroy();
                                 if SpeedData.Settings.UseBoost then
                                     local Multiplier: number = GetSpeedMultiplier()
                                     if Multiplier ~= 0 then
-                                        Speed = math.clamp(Speed * Multiplier, -1000, 46)
+                                        Speed = math.clamp(Speed * Multiplier, 0, 46)
                                     end 
                                 end
                                 
@@ -951,7 +987,7 @@ end)();
                                 if FlyData.Settings.UseBoost then
                                     local Multiplier: number = GetSpeedMultiplier()
                                     if Multiplier ~= 0 then
-                                        Speed = math.clamp(Speed * Multiplier, -1000, 46)
+                                        Speed = math.clamp(Speed * Multiplier, 0, 46)
                                     end 
                                 end
 
@@ -1151,9 +1187,9 @@ end)();
 (function()
     local KillAuraData = {
         Settings = {
-            Range = 20,
+            Range = 27,
             Delay = 0,
-            AnimationRestoreTime = 0.1,
+            AnimationRestoreTime = 0.5,
             MaxAngle = 360,
             AutoSwitch = false,
             NoSwing = false,
@@ -1278,7 +1314,7 @@ end)();
                         end
 
                         local NearestEntity = GetNearestEntity(true)
-                        if NearestEntity.Entity and (KillAuraData.Settings.Range >= NearestEntity.Distance or KillAuraData.Settings.InfRange) and Night:IsAlive(NearestEntity.Entity, true) then
+                        if NearestEntity.Entity and KillAuraData.Settings.Range >= NearestEntity.Distance and Night:IsAlive(NearestEntity.Entity, true) then
                             if KillAuraData.Settings.WallCheck then
                                 KillAuraData.Data.Params.FilterType = Enum.RaycastFilterType.Exclude
                                 KillAuraData.Data.Params.FilterDescendantsInstances = CollectionService:GetTagged("entity")
@@ -1350,15 +1386,15 @@ end)();
                                     Emitter.Color = ColorSequence.new(KillAuraData.Settings.ParticleColor)
                                 end)()
                             end
-
-                            local HitPos: Vector3 = (KillAuraData.Settings.InfRange and vector.create(0/0, 0/0, 0/0) or CalcPrediction(LocalPlayer.Character.PrimaryPart.Position, NearestEntity.Entity.PrimaryPart.Position, KillAuraData.Settings.Range))
+                            
+                            local HitPos: Vector3 = CalcPrediction(LocalPlayer.Character.PrimaryPart.Position, NearestEntity.Entity.PrimaryPart.Position, KillAuraData.Settings.Range)
                             GameData.Utils.Remotes:Get("SwordHit"):SendToServer({
                                 entityInstance = NearestEntity.Entity,
                                 chargedAttack = {chargeRatio = 0},
                                 validate = {
-                                    targetPosition = {value = (KillAuraData.Settings.InfRange and vector.create(0/0, 0/0, 0/0) or NearestEntity.Data.Root.Position)},
+                                    targetPosition = {value = NearestEntity.Data.Root.Position},
                                     raycast = {
-                                        cursorDirection = {value = (KillAuraData.Settings.InfRange and vector.create(0/0, 0/0, 0/0) or CFrame.lookAt(NearestEntity.Data.Root.Position, CurrentCamera.CFrame.Position))},
+                                        cursorDirection = {value = CFrame.lookAt(NearestEntity.Data.Root.Position, CurrentCamera.CFrame.Position)},
                                         cameraPosition = {value = HitPos}
                                     },
                                     selfPosition = {value = HitPos}
@@ -1474,8 +1510,8 @@ end)();
         Name = "Range",
         Flag = "KillAuraRange",
         Min = 1,
-        Max = 23,
-        Default = 20,
+        Max = 27,
+        Default = 27,
         CallingFunction = function(self, value: number)
             KillAuraData.Settings.Range = value
         end
@@ -1557,7 +1593,6 @@ end)();
         end
     })
 
-
     local AnimationRestoreTime = KillAura:Slider({
         Name = "Animation Restore",
         Flag = "KillAuraAnimationRestoreTime",
@@ -1570,7 +1605,6 @@ end)();
         end
     })
 
-
     local AnimationPicker = KillAura:Dropdown({
         Name = "Animation",
         Flag = "KillAuraAnimation",
@@ -1580,15 +1614,6 @@ end)();
             KillAuraData.Settings.SelectedAnimation = value
         end
     })
-
-    KillAura:MiniToggle({
-        Name = "Infinite Range",
-        Flag = "KillAuraInfiniteRange",
-        CallingFunction = function(self, value: boolean)
-            KillAuraData.Settings.InfRange = value
-        end
-    })
-
 
     KillAura:MiniToggle({
         Name = "Target Box",
@@ -1912,8 +1937,8 @@ end)();
         CallingFunction = function(self, enabled: boolean)
             if enabled then
                 local Health = {
-                    Current = math.round(LocalPlayer.Character:GetAttribute("Health")) or 0,
-                    Max = math.round(LocalPlayer.Character:GetAttribute("MaxHealth")) or 0
+                    Current = (LocalPlayer.Character and math.round(LocalPlayer.Character:GetAttribute("Health"))) or 0,
+                    Max = (LocalPlayer.Character and math.round(LocalPlayer.Character:GetAttribute("MaxHealth"))) or 0
                 }
 
                 Night:GetTargetHud(true, {Player = LocalPlayer, Health = Health})
@@ -2877,7 +2902,7 @@ end)();
 (function()
     local ProjectileAura = {
         Settings = {
-            Range = 30,
+            Range = 40,
             Speed = 100,
             Power = 50,
             Delay = 0.1,
@@ -2943,7 +2968,7 @@ end)();
         end
     end    
 
-    local function Aim(Start: Vector3, Launch: number, Gravity: number?, TargetPos: Vector3, Velocity: Vector3, HipHeight: number?): Vector3?
+    --[[local function Aim(Start: Vector3, Launch: number, Gravity: number?, TargetPos: Vector3, Velocity: Vector3, HipHeight: number?): Vector3?
         if not (Start and TargetPos and Launch and Launch > 1) then return end
         Gravity = Gravity or workspace.Gravity
         local ping: number = (Stats and (Stats.Ping:GetValue() / 1000)) or 0.1
@@ -2963,6 +2988,43 @@ end)();
     
         pred = pred + Vector3.new(0, 0.5 * Gravity * t * t, 0)
         return pred
+    end]]
+
+    local function Aim(Start: Vector3, LaunchVel: number, Gravity: number?, TargetPos: Vector3, TargetVel: Vector3, HipHeight: number?): Vector3?
+        if not (Start and TargetPos and LaunchVel > 1) then return end
+
+        Gravity = Gravity or workspace.Gravity
+        HipHeight = HipHeight or 0
+        TargetPos = TargetPos + Vector3.new(0, HipHeight, 0)
+
+        local Dist = TargetPos - Start
+        local Vec = Vector3.new(Dist.X, 0, Dist.Z)
+        local Mag = Vec.Magnitude
+        local Time = Mag / LaunchVel
+
+        for _ = 1, 5 do
+            local Velocity = Vector3.new(TargetVel.X, TargetVel.Y * 0.5, TargetVel.Z)
+            local Prediction = TargetPos + Velocity * Time
+
+            local Dist2 = Prediction - Start
+            local Horiz = Vector3.new(Dist2.X, 0, Dist2.Z)
+            local HorizDist = Horiz.Magnitude
+
+            local TimeNew = HorizDist / LaunchVel
+            TimeNew = TimeNew + math.abs((Dist2.Y + 0.5 * Gravity * Time^2) / LaunchVel)
+            Time = (Time + TimeNew) * 0.5
+        end
+
+        Time += ((Stats and Stats.Ping:GetValue() / 1000) or 0.1)
+
+        local Velocity = Vector3.new(TargetVel.X, TargetVel.Y * 0.45, TargetVel.Z)
+        local FinalPrediction = TargetPos + Velocity * Time
+
+        local Drop = math.clamp(0.22 + (80 / LaunchVel) * 0.06, 0.25, 0.38)
+        FinalPrediction -= Vector3.new(0, Drop * Gravity * Time * Time, 0)
+
+        FinalPrediction += Vector3.new(0, 1.8, 0)
+        return FinalPrediction
     end
 
     local ProjAura = Windows.Combat:CreateModule({
@@ -3046,7 +3108,7 @@ end)();
         Flag = "ProjectileAuraRange",
         Min = 1,
         Max = 200,
-        Default = 140,
+        Default = 40,
         CallingFunction = function(self, value: number)
             ProjectileAura.Settings.Range = value
         end
@@ -3117,7 +3179,7 @@ end)();
     local Speed: number = 80
     local Time: number = 1.5
     local StartTime: number = 0
-    local Height: number = 12
+    local Height: number = 5
     local UseBoost: boolean = false
     local UseTimeUI: boolean = false
     local TimeUI
@@ -3171,7 +3233,7 @@ end)();
                         workspace:GetServerTimeNow() - 0.325
                     )
                 else
-                    local Dao = FindItemFromInventory("_dao")
+                    local Dao = GetItem("_dao", true)
                     if Dao and GameData.Utils.AbilityController:canUseAbility("dash") then
                         ReplicatedStorage["events-@easy-games/game-core:shared/game-core-networking@getEvents.Events"].useAbility:FireServer("dash", {
                             direction = LocalPlayer.Character.PrimaryPart.CFrame.LookVector,
@@ -3250,9 +3312,9 @@ end)();
     LongJump:Slider({
         Name = "Height",
         Flag = "LongJumpHeight",
-        Min = 5,
+        Min = 1,
         Max = 20,
-        Default = 15,
+        Default = 5,
         CallingFunction = function(self, value: number)
             Height = value
         end
@@ -3666,15 +3728,17 @@ end)();
                             end
                             task.wait() 
                         until AntiHitData.Data.CanTeleport or not AntiHitData.Settings.WaitUntilDamage
-                        
+
                         if self.Enabled and AntiHitData.Data.Clone and Night:IsAlive(LocalPlayer) and isnetworkowner(LocalPlayer.Character.PrimaryPart) then
                             if AntiHitData.Settings.StayUp then
                                 PrimaryPart.CFrame = AntiHitData.Data.Clone.Clone.CFrame + Vector3.new(0, AntiHitData.Settings.Height, 0)
                                 task.wait(AntiHitData.Settings.StayUp)
+                                PrimaryPart.Velocity = Vector3.new(0, -1, 0)
                                 PrimaryPart.CFrame = AntiHitData.Data.Clone.Clone.CFrame
                             else
                                 PrimaryPart.CFrame = AntiHitData.Data.Clone.Clone.CFrame - Vector3.new(0, AntiHitData.Settings.Height / 2, 0)
                                 task.wait(AntiHitData.Settings.StayUp)
+                                PrimaryPart.Velocity = Vector3.new(0, -1, 0)
                                 PrimaryPart.CFrame = AntiHitData.Data.Clone.Clone.CFrame
                             end
 
@@ -3768,7 +3832,7 @@ end)();
             Party = false
         },
         Data = {
-            Clans = {"VA", "IPS", "TYP", "gg", "Gdoggs", "L8R", "DV"},
+            Clans = {"VA", "IPS", "TYP", "gg", "Gdoggs", "L8R", "DV", "ALPH4"},
             Players = {},
             Friends = {},
             Active = {}
@@ -4427,7 +4491,7 @@ end)();
                     elseif SelectedKit == "Kaida" then
                         local NearestEntity = GetNearestEntity(true)
                         if NearestEntity.Entity and ActivationDistance >= NearestEntity.Distance and GameData.Utils.SummonerKitBalance.CLAW_COOLDOWN < (workspace:GetServerTimeNow() - GameData.Utils.ClawHandController.lastAttackTime) then
-                            local Claw = FindItemFromInventory("summoner_claw")
+                            local Claw = GetItem("summoner_claw", true)
                             if Claw and Claw.tool then
                                 if CanSwitchItem then
                                     SwitchItem(Claw.tool, true)
@@ -4555,18 +4619,27 @@ end)();
             "night > <PLR>",
             "gg ez <PLR>",
             "get better <PLR>",
-            "easiest kill ever <PLR>"
+            "easiest kill ever <PLR>",
+            "imagine dying <PLR>",
+            "get pwned <PLR>",
+            "hop off <PLR> ✌️",
+            "did you even try <PLR>?",
+            "thanks for the kill <PLR> 😘"
         },
         Bed = {
             "nice bed <TEAM>",
-            "TEAM has officially lost the game",
-            "amusing defense <TEAM>"
+            "<TEAM> has officially lost the game",
+            "amusing defense <TEAM>",
+            "<TEAM>'s bed got sent into the oblivion",
+            "poof, your bed is gone <TEAM>"
         },
         Win = {
             "gg ez | night on top",
             "easiest game of my life | night on top",
             "didn't even have to try | night on top",
-            "bot arena cleared | night on top"
+            "bot arena cleared | night on top",
+            "has any of you even tried? | night on top",
+            "trillionaire's bypasses have defeated y'all | night on top"
         }
     }
 
@@ -4576,6 +4649,31 @@ end)();
         Win = Messages.Win
     }
 
+    local LastMessage = {
+        Kill = nil,
+        Bed = nil,
+        Win = nil
+    }
+
+    local function GetRandomMessage(category: string, replace)
+        local Table = Messages[category]
+        if #Table == 1 then
+            return string.gsub(Table[1], unpack(replace))
+        end
+
+        local Message: string
+        repeat
+            Message = Table[math.random(1, #Table)]
+        until Message ~= LastMessage[category] or #Table == 1
+
+        LastMessage[category] = Message
+        for i, v in next, replace do
+            Message = string.gsub(Message, i, v)
+        end
+
+        return Message
+    end
+
     local AutoToxic = Windows.Utility:CreateModule({
         Name = "Auto Toxic",
         Flag = "AutoToxic",
@@ -4583,19 +4681,19 @@ end)();
             if enabled then
                 self:Connection(GameData.Events.Death.Event:Connect(function(Value)
                     if AutoToxicData.Kill and Value.Killer == LocalPlayer.Character and (AutoToxicData.Final and Value.Final or not AutoToxicData.Final) then
-                        TextChatService.TextChannels.RBXGeneral:SendAsync(string.gsub(Messages.Kill[math.random(1, #Messages.Kill)], "<PLR>", Value.KilledPlayer.Name))
+                        TextChatService.TextChannels.RBXGeneral:SendAsync(GetRandomMessage("Kill", {["<PLR>"] = Value.KilledPlayer.Name}))
                     end
                 end))
 
                 self:Connection(GameData.Events.BedBreak.Event:Connect(function(Value)
                     if AutoToxicData.Bed then
-                        TextChatService.TextChannels.RBXGeneral:SendAsync(string.gsub(Messages.Bed[math.random(1, #Messages.Bed)], "<TEAM>", Value.TeamName))
+                        TextChatService.TextChannels.RBXGeneral:SendAsync(GetRandomMessage("Bed", {["<TEAM>"] = Value.TeamName}))
                     end
                 end))
 
                 self:Connection(GameData.Events.MatchEnd.Event:Connect(function(Value)
                     if AutoToxicData.Win and Value.TeamID == GameData.Utils.Store:getState().Game.myTeam.id then
-                        TextChatService.TextChannels.RBXGeneral:SendAsync(Messages.Win[math.random(1, #Messages.Win)])
+                        TextChatService.TextChannels.RBXGeneral:SendAsync(GetRandomMessage("Win", {}))
                     end
                 end))
             end
@@ -4790,7 +4888,7 @@ end)();
 end)();
 
 (function()
-    local Speed = 0.24
+    local Speed: number = 0.24
 
     local FastBreak = Windows.Utility:CreateModule({
         Name = "Fast Break",
@@ -4821,7 +4919,7 @@ end)();
 end)();
 
 (function()
-    local Distance = 30
+    local Distance: number = 30
 
     local FarBreak = Windows.Utility:CreateModule({
         Name = "Far Break",
@@ -4846,6 +4944,286 @@ end)();
         Default = 30,
         CallingFunction = function(self, value: number)
             Distance = value
+        end
+    })
+end)();
+
+(function()
+    local Old
+    Windows.Movement:CreateModule({
+        Name = "No Slow",
+        Flag = "NoSlow",
+        CallingFunction = function(self, enabled: boolean)
+            local Modifier = GameData.Utils.Sprint:getMovementStatusModifier()
+            if enabled then
+                if not Old then
+                    Old = Modifier.addModifier
+                    Modifier.addModifier = function(self, Tab: {moveSpeedMultiplier: number, blockSprint: boolean})
+                        if Tab.moveSpeedMultiplier and 1 > Tab.moveSpeedMultiplier and Tab.blockSprint then
+                            Tab.moveSpeedMultiplier = 1
+                        end
+                        Tab.blockSprint = false
+                        return Old(self, Tab)
+                    end
+                end
+            else
+                if Old then
+                    Modifier.addModifier = Old
+                    Old = nil
+                end
+            end
+        end
+    })
+end)();
+
+(function()
+    local Hook
+    local Old
+
+    Windows.Utility:CreateModule({
+        Name = "Anti Detection",
+        Flag = "AntiDetection",
+        CallingFunction = function(self, enabled: boolean)
+            if enabled then
+                if not Hook then
+                    Hook = hookmetamethod(game, "__namecall", function(self, ...)
+                        if (self.Name == "reportPerformanceMetrics" or self.Name == "AnalyticsReportEvent") and self.Enabled then
+                            return
+                        end
+                        return Hook(self, ...)
+                    end)
+                end
+
+                Old = GameData.Utils.Remotes.Get
+                GameData.Utils.Remotes.Get = function(Night, Item: string, ...)
+                    if string.find(Item, "[dD][eE][tT][eE][cC][tT][iI][oO][nN]") then
+                        return {SendToServer = function() end}
+                    end
+                    return Old(Night, Item, ...)
+                end
+            else
+                if Old then
+                    GameData.Utils.Remotes.Get = Old
+                    Old = nil
+                end
+            end
+        end
+    })
+end)();
+
+(function()
+    local ChestESP
+    local ChestESPData = {
+        Settings = {
+            Items = {"emerald", "speed"},
+            Color = Color3.fromRGB(0, 0, 0),
+            Trans = 0.5,
+            Corner = 6
+        },
+        Connect = {}
+    }
+
+    local ChestESPFolder: Folder = Instance.new("Folder", PlayerGui)
+    ChestESPFolder.Name = "[Night] Chest ESP"
+
+    local function MainESP(Object)
+        local Chest = Object:FindFirstChild("ChestFolderValue") and Object.ChestFolderValue.Value
+        if not Chest then 
+            local Start: number = os.clock()
+            repeat task.wait() until (Object:FindFirstChild("ChestFolderValue") and Object:FindFirstChild("ChestFolderValue").Value) or (os.clock() - Start) > 15
+            Chest = Object:FindFirstChild("ChestFolderValue") and Object.ChestFolderValue.Value
+            
+            if not Chest then
+                return
+            end
+        end
+
+        local Billboard = Instance.new("BillboardGui", ChestESPFolder)
+        Billboard.Name, Billboard.Adornee = "[Night] Chest ESP", Object
+        Billboard.StudsOffsetWorldSpace, Billboard.Size = Vector3.new(0, 5, 0), UDim2.fromOffset(35, 35)
+        Billboard.AlwaysOnTop, Billboard.ClipsDescendants = true, false
+
+        local Frame = Instance.new("Frame", Billboard)
+        Frame.Size = UDim2.fromScale(1, 1)
+        Frame.BackgroundColor3, Frame.BackgroundTransparency = ChestESPData.Settings.Color, ChestESPData.Settings.Trans
+        Instance.new("UICorner", Frame).CornerRadius = UDim.new(0, ChestESPData.Settings.Corner)
+
+        local Layout = Instance.new("UIListLayout", Frame)
+        Layout.FillDirection, Layout.Padding = Enum.FillDirection.Vertical, UDim.new(0, 5)
+        Layout.VerticalAlignment, Layout.HorizontalAlignment = Enum.VerticalAlignment.Center, Enum.HorizontalAlignment.Center
+        Layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+            local Width = Layout.AbsoluteContentSize.X + 5
+            if Width < 35 then
+                Width = 35
+            end
+            Billboard.Size = UDim2.fromOffset(Width, Layout.AbsoluteContentSize.Y + 5)
+        end)
+
+        local function Update()
+            local Objects = Billboard.Adornee:FindFirstChild("ChestFolderValue") and Billboard.Adornee.ChestFolderValue.Value:GetChildren()
+            if not Objects then
+                Billboard.Enabled = false
+                return
+            end
+
+            for _, v in Billboard.Frame:GetChildren() do
+                if v:IsA("ImageLabel") then
+                    v:Destroy()
+                end
+            end
+            Billboard.Enabled = false
+
+            local Found = {}
+            for _, Item in Objects do
+                local Name, Match = Item.Name, nil
+                for _, v in next, ChestESPData.Settings.Items do
+                    if string.find(string.lower(Name), string.lower(v)) then
+                        Match = v
+                        break
+                    end
+                end
+                
+                if not Found[Name] and (Match or table.find(ChestESPData.Settings.Items, Name)) then
+                    Found[Name], Billboard.Enabled = true, true
+                    local Image = Instance.new("ImageLabel", Billboard.Frame)
+                    Image.Size, Image.BackgroundTransparency, Image.Image = UDim2.fromOffset(27, 27), 1, GameData.Utils.ItemMeta[Name].image
+                end
+            end
+        end
+
+        for _, v in {Chest.ChildAdded, Chest.ChildRemoved} do
+            ChestESP:Connection(v:Connect(function(item)
+                for _, v in next, ChestESPData.Settings.Items do
+                    if string.find(string.lower(item.Name), string.lower(v)) then
+                        Update()
+                        return
+                    end
+                end
+            end), ChestESPData.Connect)
+        end
+        task.spawn(Update)
+    end
+
+    ChestESP = Windows.Render:CreateModule({
+        Name = "Chest ESP",
+        Flag = "ChestESP",
+        CallingFunction = function(self, enabled: boolean)
+            if enabled then
+                repeat task.wait() until GameData.Utils.Store:getState().Game.matchstate ~= 0
+
+                table.insert(ChestESPData.Connect, CollectionService:GetInstanceAddedSignal("chest"):Connect(MainESP))
+                for _, Chest in CollectionService:GetTagged("chest") do
+                    task.spawn(MainESP, Chest)
+                end
+            else
+                for _, v in next, ChestESPData.Connect do
+                    v:Disconnect()
+                end
+                ChestESPData.Connect = {}
+                
+                for _, v in next, ChestESPFolder:GetChildren() do
+                    v:Destroy()
+                end
+            end
+        end
+    })
+
+    ChestESP:ColorSlider({
+        Name = "Color",
+        Flag = "ChestESPColor",
+        Default = Color3.fromRGB(0, 0, 0),
+        CallingFunction = function(self, value: Color3)
+            ChestESPData.Settings.Color = value
+        end
+    })
+
+    ChestESP:TextBox({
+        Name = "Items",
+        Flag = "ChestESPItems",
+        Default = "emerald, speed",
+        CallingFunction = function(self, value: string)
+            ChestESPData.Settings.Items = Separate(value)
+        end
+    })
+
+    ChestESP:Slider({
+        Name = "Corner",
+        Flag = "ChestESPCorner",
+        Min = 0,
+        Max = 10,
+        Default = 6,
+        CallingFunction = function(self, value: number)
+            ChestESPData.Settings.Corner = value
+        end
+    })
+end)();
+
+(function()
+    local AutoBallonHeight: number = 0
+    local Amount: number = 3
+    local ShouldSwitchItem: boolean = false
+
+    local AutoBalloon = Windows.Utility:CreateModule({
+        Name = "Auto Balloon",
+        Flag = "AutoBalloon",
+        CallingFunction = function(self, value: boolean)
+            if value then
+                local YLevel: number = GetYLevel()
+
+                repeat
+                    if Night:IsAlive(LocalPlayer) and LocalPlayer.Character.HumanoidRootPart.Position.Y <= (YLevel + AutoBallonHeight) then
+                        local Inflated: number = (LocalPlayer.Character:GetAttribute("InflatedBalloons") or 0)
+                        if 3 > Inflated then
+                            local Balloons = GetItem("balloon")
+                            if Balloons then
+                                for i = 1, (Amount - Inflated) do
+                                    Inflated = (LocalPlayer.Character:GetAttribute("InflatedBalloons") or 0)
+                                    if Inflated >= 3 or not GetItem("balloon") then
+                                        break
+                                    end
+
+                                    if ShouldSwitchItem then
+                                        SwitchItem(Balloons.tool)
+                                    end
+
+                                    GameData.Utils.Remotes:Get("InflateBalloon"):SendToServer()
+                                end
+                            end
+                        end
+                    end
+                    task.wait()
+                until not self.Enabled
+            end
+        end
+    })
+
+    AutoBalloon:Slider({
+        Name = "Height",
+        Flag = "AutoBalloonActivationHeight",
+        Min = 0,
+        Max = 100,
+        Default = 0,
+        CallingFunction = function(self, value: number)
+            AutoBallonHeight = value
+        end
+    })
+
+    AutoBalloon:Slider({
+        Name = "Amount",
+        Flag = "AutoBalloonUsageAmount",
+        Min = 1,
+        Max = 3,
+        Default = 3,
+        CallingFunction = function(self, value: number)
+            Amount = value
+        end
+    })
+
+    AutoBalloon:MiniToggle({
+        Name = "Switch Item",
+        Flag = "AutoBalloonSwitchItem",
+        CallingFunction = function(self, value: boolean)
+            ShouldSwitchItem = value
         end
     })
 end)();
