@@ -29,6 +29,7 @@ local Lighting: Lighting = Night.cloneref(game:GetService("Lighting"))
 local HttpService: HttpService = Night.cloneref(game:GetService("HttpService"))
 local UserInputService: UserInputService = Night.cloneref(game:GetService("UserInputService"))
 local TweenService: TweenService = Night.cloneref(game:GetService("TweenService"))
+local VirtualInputManager: VirtualInputManager = Night.cloneref(game:GetService("VirtualInputManager"))
 local Terrain: Terrain = workspace:FindFirstChildOfClass("Terrain")
 
 local LocalPlayer = Players.LocalPlayer :: Player
@@ -2527,33 +2528,15 @@ end)();
         CPS = 10
     }
 
-    local AutoClicker
-    AutoClicker = Tabs.Combat:CreateModule({
+    local AutoClicker = Tabs.Combat:CreateModule({
         Name = "Auto Clicker",
         Flag = "UniversalAutoClicker",
         CallingFunction = function(self, enabled: boolean)
             if enabled then
-				repeat
-                    if Night:IsAlive(LocalPlayer) then
-                        if mouse1press and mouse2press then
-                            if AutoClickerData.ClickType == "Left" then
-                                if UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
-                                    mouse1press()
-                                end
-                            else
-                                if UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
-                                    mouse2press()
-                                end
-                            end
-                        else
-                            Night:CreateNotification({
-                                Title = "Auto Clicker",
-                                Description = "Your executor doesn't support click functions.",
-                                Duration = 10
-                            })
-                            AutoClicker:SetValue(false, false, false)
-                        end
-                    end
+                repeat
+                    local Mouse: Mouse? = LocalPlayer:GetMouse()
+                    VirtualInputManager:SendMouseButtonEvent(Mouse.X, Mouse.Y + 8, AutoClickerData.ClickType == "Left" and 0 or 1, true, game, 1)
+                    VirtualInputManager:SendMouseButtonEvent(Mouse.X, Mouse.Y + 8, AutoClickerData.ClickType == "Left" and 0 or 1, false, game, 1)
                     task.wait(1 / AutoClickerData.CPS)
                 until not self.Enabled
             end
