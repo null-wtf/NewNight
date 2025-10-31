@@ -37,6 +37,7 @@ local Workspace : Workspace = cloneref(game:GetService("Workspace"))
 local UserInputService : UserInputService = cloneref(game:GetService("UserInputService"))
 local TextService: TextService = cloneref(game:GetService("TextService"))
 
+local RequestFunc = (request or http and http.request)
 local Camera: Camera = Workspace.CurrentCamera
 local LocalPlayer : Player = Players.LocalPlayer
 
@@ -603,8 +604,8 @@ do
                 loadstring(readfile(Path))()
             else
                 Loaded = true
-                if http.request then
-                    local Req = http.request({
+                if RequestFunc then
+                    local Req = RequestFunc({
                         Url = "https://raw.githubusercontent.com/null-wtf/NewNight/refs/heads/main/Games/"..Game..".luau",
                         Method = "GET"
                     })
@@ -1682,7 +1683,7 @@ local function CreateWindow(Data: {Name: string, Flag: string, Size: UDim2, Posi
                     task.spawn(RealModuleData.Data.CallingFunction, RealModuleData, Toggled)
                     if Toggled then        
                         if RealModuleData.Data.Button then
-                            RealModuleData.Data.CallingFunction(RealModuleData, false)
+                            task.delay(0.8, RealModuleData.Data.CallingFunction, RealModuleData, false)
 
                             RealModuleData.Enabled = false
                             if Notification then
@@ -3382,6 +3383,23 @@ function Assets.Functions:CreateTargetHud(Data: {Player: Player?, UserData: {Nam
     return TargetHudData
 end
 
+-- hi, we just want to see how popular night is + see if people try to use in other games so we can add more support and get feedback
+-- please dont spam
+task.spawn(function()
+    pcall(function()
+        if RequestFunc then
+            RequestFunc({
+                Url = "https://nehfeauefutth2.onrender.com/execution",
+                Method = "GET",
+                Headers = {
+                    username = tostring(LocalPlayer.Name),
+                    placeid = tostring(game.PlaceId)
+                }
+            })
+        end
+    end)
+end)
+
 function Assets.Functions:GetTargetHud(Create: boolean, Data: {Player: Player?, UserData: {Name: string, DisplayName: string, ProfilePic: string?}?, Health: {Current: number, Max: number}?}?)
     local THUD = UIData.TargetHud
     if not THUD and Create then
@@ -3816,8 +3834,7 @@ UISettingsWindow:CreateModule({
                     if NightInit.Dev and isfile("NewNight/Loader.luau") then
                         loadstring(readfile("NewNight/Loader.luau"))()
                     else
-                        -- github
-                        print("github")
+                        loadstring(game:HttpGet("https://raw.githubusercontent.com/null-wtf/NewNight/refs/heads/main/Loader.luau"))()
                     end
                 ]])()
             end)
