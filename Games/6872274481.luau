@@ -63,7 +63,9 @@ local GameData = {
         PlaceController = Knit.Controllers.BlockPlacementController,
         SummonerKitBalance = require(ReplicatedStorage.TS.games.bedwars.kit.kits.summoner["summoner-kit-balance"]).SummonerKitBalance,
         AbilityController = Flamework.resolveDependency("@easy-games/game-core:client/controllers/ability/ability-controller@AbilityController"),
-        UILayer = require(ReplicatedStorage.rbxts_include.node_modules["@easy-games"]["game-core"].out).UILayers
+        UILayer = require(ReplicatedStorage.rbxts_include.node_modules["@easy-games"]["game-core"].out).UILayers,
+        MatchHistroyApp = require(LocalPlayer.PlayerScripts.TS.controllers.global["match-history"].ui["match-history-moderation-app"]).MatchHistoryModerationApp,
+        MatchHistroyController = Knit.Controllers.MatchHistoryController
     },
     Events = {
         Damage = Instance.new("BindableEvent"),
@@ -158,11 +160,22 @@ CollectionService:GetInstanceRemovedSignal("block"):Connect(function(inst: Insta
     end
 end)
 
+local function Warning(Title, Description, Duration)
+    pcall(function()
+		setthreadidentity(8)
+    end)
+    Night:CreateNotification({
+        Title = Title,
+        Description = Description,
+        Duration = Duration
+    })
+end
+
 local function Separate(Input: string)
     local Text = string.split(Input, ",")
     local Table = {}
-    for _, item in next, Text do
-        local Selected = item:gsub("^%s*(.-)%s*$", "%1")
+    for _, Item in next, Text do
+        local Selected = Item:gsub("^%s*(.-)%s*$", "%1")
         if Selected ~= "" then
             table.insert(Table, Selected)
         end
@@ -350,7 +363,7 @@ local function GetBlocks()
     return Data
 end
 
-local function SwitchItem(Item: Instance, SwitchBack: boolean)
+local function SwitchItem(Item: Instance)
     if not Item then
         return
     end
@@ -385,12 +398,7 @@ local function SwitchItem(Item: Instance, SwitchBack: boolean)
         GameData.Utils.Remotes:Get("SetInvItem"):CallServerAsync({
             hand = Item
         }):andThen(function(suc: boolean)
-            if suc then
-                Completed = true
-                if SwitchBack and CurrentItem then
-                    task.delay(0.1, SwitchItem, CurrentItem)
-                end
-            end
+            Completed = true
         end)
 
         repeat task.wait() until Completed
@@ -412,15 +420,11 @@ local function SwitchItem(Item: Instance, SwitchBack: boolean)
             end
 
             task.wait() 
-        until false or (os.clock() - CompTime) > 0.5
+        until false or (os.clock() - CompTime) > 0.3
 
-        task.wait(0.025)
-        if SwitchBack then
-            task.delay(0.1, SwitchItem, CurrentItem)
-        end
+        task.wait(0.01)
     end
 end
-
 
 local function GetEntities(): {{Entity: Model, Player: Player?, Health: number, MaxHealth: number, Humanoid: Humanoid, Root: BasePart, Type: string}}
     local Entities = {}
@@ -752,7 +756,6 @@ Windows.Render.Modules.TargetHUD:Destroy()
 Windows.Movement.Modules.UniversalWallClimb:Destroy()
 Windows.Utility.Modules.UniversalAntiAFK:Destroy()
 Windows.Movement.Modules.UniversalNoClip:Destroy();
---Windows.Combat.Modules.UniversalAutoClicker:Destroy();
 
 (function()
     local SpeedData = {
@@ -1263,17 +1266,6 @@ end)();
         }
     }
 
-    local function CalcPrediction(Player: Vector3, Target: Vector3, Range: number): Vector3
-        local Dir: Vector3 = Target - Player
-        local Dist: number = Dir.Magnitude
-
-        if Dist <= 11.5 or Range <= 11.5 then
-            return Player
-        end
-
-        return Player + Dir.Unit * (Dist - 14)
-    end
-
     local KillAura = Windows.Combat:CreateModule({
         Name = "Kill Aura",
         Flag = "KillAura",
@@ -1386,15 +1378,15 @@ end)();
                                     Emitter.Color = ColorSequence.new(KillAuraData.Settings.ParticleColor)
                                 end)()
                             end
-                            
-                            local HitPos: Vector3 = CalcPrediction(LocalPlayer.Character.PrimaryPart.Position, NearestEntity.Entity.PrimaryPart.Position, KillAuraData.Settings.Range)
+
+                            local HitPos: Vector3 = (math.clamp(NearestEntity.Distance - 14.4, 10, 30) * (NearestEntity.Entity.PrimaryPart.Position - LocalPlayer.Character.PrimaryPart.Position).Unit) + LocalPlayer.Character.PrimaryPart.Position
                             GameData.Utils.Remotes:Get("SwordHit"):SendToServer({
                                 entityInstance = NearestEntity.Entity,
                                 chargedAttack = {chargeRatio = 0},
                                 validate = {
                                     targetPosition = {value = NearestEntity.Data.Root.Position},
                                     raycast = {
-                                        cursorDirection = {value = CFrame.lookAt(NearestEntity.Data.Root.Position, CurrentCamera.CFrame.Position)},
+                                        cursorDirection = {value = CFrame.lookAlong(HitPos, NearestEntity.Data.Root.Position).LookVector},
                                         cameraPosition = {value = HitPos}
                                     },
                                     selfPosition = {value = HitPos}
@@ -1405,7 +1397,7 @@ end)();
                             if not KillAuraData.Settings.NoSwing then
                                 GameData.Utils.Animation:playAnimation(LocalPlayer, GameData.Utils.ProdAnimations[GameData.Utils.AnimationType.SWORD_SWING])
                             end
-
+                            
                             if KillAuraData.Settings.UseAnimation then
                                 coroutine.wrap(function()
                                     local ViewModel: Model = GetViewModel()
@@ -2135,6 +2127,8 @@ end)();
             if enabled then
                 OldApply = GameData.Utils.Knockback.applyKnockback
                 GameData.Utils.Knockback.applyKnockback = function(Part: BasePart, RealKnockback: number, ...)
+                    if KnockbackValue == 0 then return end
+
                     return OldApply(Part, KnockbackValue, ...)
                 end
             else
@@ -2966,29 +2960,7 @@ end)();
                 GameData.Utils.Sound:playSound(Sounds[1])
             end
         end
-    end    
-
-    --[[local function Aim(Start: Vector3, Launch: number, Gravity: number?, TargetPos: Vector3, Velocity: Vector3, HipHeight: number?): Vector3?
-        if not (Start and TargetPos and Launch and Launch > 1) then return end
-        Gravity = Gravity or workspace.Gravity
-        local ping: number = (Stats and (Stats.Ping:GetValue() / 1000)) or 0.1
-    
-        TargetPos = TargetPos + Vector3.new(0, HipHeight or 0, 0)
-    
-        local rel: Vector3 = TargetPos - Start
-        local dist: number = rel.Magnitude
-        local t: number = dist / Launch + ping
-    
-        local horizLead: Vector3 = Vector3.new(Velocity.X, 0, Velocity.Z) * t
-        local pred: Vector3 = TargetPos + horizLead
-    
-        rel = pred - Start
-        dist = rel.Magnitude
-        t = dist / Launch
-    
-        pred = pred + Vector3.new(0, 0.5 * Gravity * t * t, 0)
-        return pred
-    end]]
+    end
 
     local function Aim(Start: Vector3, LaunchVel: number, Gravity: number?, TargetPos: Vector3, TargetVel: Vector3, HipHeight: number?): Vector3?
         if not (Start and TargetPos and LaunchVel > 1) then return end
@@ -3049,21 +3021,11 @@ end)();
                                 end
                             end
 
-                            if GameData.Data.KillAuraTarget then
-                                task.wait()
-                                continue
-                            end
-
-                            if Windows.Movement.Modules.LongJump.Enabled then
-                                task.wait()
-                                continue
-                            end
-
                             for i = 1, #Tools do
                                 local Obj = Tools[i]
                                 local ItemType = Obj.Item.itemType
 
-                                if (ProjectileAura.Data.DelayProj[ItemType] or 0) < os.clock() then
+                                if (ProjectileAura.Data.DelayProj[ItemType] or 0) < os.clock() and not GameData.Data.KillAuraTarget and not Windows.Movement.Modules.LongJump.Enabled then
                                     local ProjData = GameData.Utils.ProjMeta[Obj.Proj]
                                     local LaunchVel = ProjData.launchVelocity
                                     local AimPos = Aim(Pos, LaunchVel, ProjData.gravitationalAcceleration or 196.2, Target.Entity.PrimaryPart.Position, Target.Entity.PrimaryPart.Velocity, Target.Entity.Humanoid.HipHeight)
@@ -3176,12 +3138,16 @@ end)();
 end)();
 
 (function()
+    local Mode: string = "Hybrid"
     local Speed: number = 80
+    local VeloSpeed: number = 60
     local Time: number = 1.5
     local StartTime: number = 0
     local Height: number = 5
+    local VeloHeight: number = 8
     local UseBoost: boolean = false
     local UseTimeUI: boolean = false
+    local CombatCheck: boolean = false
     local TimeUI
 
     local LongJump = Windows.Movement:CreateModule({
@@ -3250,29 +3216,66 @@ end)();
                 repeat task.wait() until CanLongJump
 
                 local Boosted: boolean = false
-                repeat
-                    if not Boosted then
-                        local RealSpeed: number = Speed
-                        if UseBoost then
-                            local Multiplier: number = GetSpeedMultiplier()
-                            if Multiplier ~= 0 then
-                                RealSpeed *= Multiplier
+                if Mode == "Boost" then
+                    repeat
+                        if not Boosted then
+                            local RealSpeed: number = Speed
+                            if UseBoost then
+                                local Multiplier: number = GetSpeedMultiplier()
+                                if Multiplier ~= 0 then
+                                    RealSpeed *= Multiplier
+                                end
                             end
+
+                            RealSpeed = CombatCheck and GameData.Data.KillAuraTarget and (RealSpeed / 2) or RealSpeed
+                            PrimaryPart.AssemblyLinearVelocity = Vector3.new(Humanoid.MoveDirection.X * RealSpeed, Height, Humanoid.MoveDirection.Z * RealSpeed)      
+                        end
+                        
+                        Boosted = not Boosted
+
+                        if TimeUI then
+                            TimeUI:Update(string.format("%.1f", (StartTime + Time) - os.clock()))
                         end
 
-                        PrimaryPart.AssemblyLinearVelocity = Vector3.new(Humanoid.MoveDirection.X * RealSpeed, Height, Humanoid.MoveDirection.Z * RealSpeed)      
-                    end
-                    
-                    Boosted = not Boosted
+                        task.wait()
+                    until not self.Enabled or (os.clock() - StartTime) >= Time
+                    self:SetValue(false)
+                else
+                    local Velocity = VeloHeight + 5
+                    task.spawn(function()
+                        repeat
+                            task.wait()
+                            Velocity -= 0.1
+                            LocalPlayer.Character.PrimaryPart.AssemblyLinearVelocity = Vector3.new(0, Velocity, 0)
+                        until not self.Data.Enabled
+                    end)
 
-                    if TimeUI then
-                        TimeUI:Update(string.format("%.1f", (StartTime + Time) - os.clock()))
-                    end
+                    self:Connection(RunService.PreSimulation:Connect(function(Delta)
+                        if (os.clock() - StartTime) >= Time then
+                            self:SetValue(false)
+                            return
+                        end
 
-                    task.wait()
-                until not self.Enabled or (os.clock() - StartTime) >= Time
+                        local MoveDirection = LocalPlayer.Character.PrimaryPart.CFrame.LookVector
+                        local LJSpeed = CombatCheck and GameData.Data.KillAuraTarget and (VeloSpeed / 2) or VeloSpeed
 
-                self:SetValue(false)
+                        LocalPlayer.Character.HumanoidRootPart.AssemblyLinearVelocity = (MoveDirection * (LJSpeed + GetSpeedMultiplier())) + Vector3.new(0, LocalPlayer.Character.HumanoidRootPart.AssemblyLinearVelocity.Y, 0)
+                        if LocalPlayer.Character.Humanoid.FloorMaterial == Enum.Material.Air then
+                            if not Boosted then
+                                LocalPlayer.Character.HumanoidRootPart.AssemblyLinearVelocity = Vector3.new(LocalPlayer.Character.HumanoidRootPart.AssemblyLinearVelocity.X, VeloHeight + 5, LocalPlayer.Character.HumanoidRootPart.AssemblyLinearVelocity.Z)
+                                Boosted = true
+                            else
+                                LocalPlayer.Character.HumanoidRootPart.AssemblyLinearVelocity += Vector3.new(0, Delta * (workspace.Gravity - (VeloHeight + 14)), 0)
+                            end
+                        else
+                            LocalPlayer.Character.HumanoidRootPart.AssemblyLinearVelocity = Vector3.new(LocalPlayer.Character.HumanoidRootPart.AssemblyLinearVelocity.X, VeloHeight + 5, LocalPlayer.Character.HumanoidRootPart.AssemblyLinearVelocity.Z)
+                        end
+
+                        if TimeUI then
+                            TimeUI:Update(string.format("%.1f", (StartTime + Time) - os.clock()))
+                        end
+                    end))
+                end
             else
                 if Night:IsAlive(LocalPlayer) then
                     LocalPlayer.Character.PrimaryPart.Anchored = false
@@ -3286,14 +3289,40 @@ end)();
         end
     })
 
-    LongJump:Slider({
+    local Speed1, Speed2, Height1, Height2
+    LongJump:Dropdown({
+        Name = "Mode",
+        Flag = "LongJumpMode",
+        Default = "Hybrid",
+        Options = {"Hybrid", "Boost"},
+        CallingFunction = function(self, Value: string)
+            Mode = Value
+            Speed1:SetVisiblity(Value == "Boost")
+            Height1:SetVisiblity(Value == "Boost")
+            Speed2:SetVisiblity(Value == "Hybrid")
+            Height2:SetVisiblity(Value == "Hybrid")
+        end
+    })
+
+    Speed1 = LongJump:Slider({
         Name = "Speed",
         Flag = "LongJumpSpeed",
         Min = 40,
-        Max = 120,
-        Default = 100,
+        Max = 100,
+        Default = 80,
         CallingFunction = function(self, value: number)
             Speed = value
+        end
+    })
+
+    Speed2 = LongJump:Slider({
+        Name = "Speed",
+        Flag = "LongJumpSpeed1",
+        Min = 30,
+        Max = 60,
+        Default = 60,
+        CallingFunction = function(self, value: number)
+            VeloSpeed = value
         end
     })
 
@@ -3309,7 +3338,7 @@ end)();
         end
     })
 
-    LongJump:Slider({
+    Height1 = LongJump:Slider({
         Name = "Height",
         Flag = "LongJumpHeight",
         Min = 1,
@@ -3317,6 +3346,26 @@ end)();
         Default = 5,
         CallingFunction = function(self, value: number)
             Height = value
+        end
+    })
+
+    Height2 = LongJump:Slider({
+        Name = "Height",
+        Flag = "LongJumpHeight",
+        Min = 1,
+        Max = 20,
+        Default = 8,
+        CallingFunction = function(self, value: number)
+            VeloHeight = value
+        end
+    })
+
+    LongJump:MiniToggle({
+        Name = "Combat Check",
+        Flag = "LongJumpCombatCheck",
+        Default = true,
+        CallingFunction = function(self, value: boolean)
+            CombatCheck = value
         end
     })
 
@@ -3661,11 +3710,15 @@ end)();
 (function()
     local AntiHitData = {
         Settings = {
-            Distance = 20,
+            Distance = 27,
             Height = 100,
-            StayUp = 0.25,
+            StayUp = 0.2,
+            StayDown = 0.1,
             PlayersOnly = false,
-            WaitUntilDamage = false
+            WaitUntilDamage = false,
+            Dynamic = false,
+            UpModifier = 0.5,
+            DownModifier = 0.5
         },
         Data = {
             Target = nil,
@@ -3696,7 +3749,6 @@ end)();
                     if AntiHitData.Data.Clone and Night:IsAlive(LocalPlayer) then
                         local RealClone: BasePart = AntiHitData.Data.Clone.Clone
                         local OldRoot: BasePart = AntiHitData.Data.Clone.PrimaryPart
-
                         RealClone.CFrame = CFrame.lookAlong(Vector3.new(OldRoot.Position.X, RealClone.Position.Y, OldRoot.Position.Z), OldRoot.CFrame.LookVector)
                         if LocalPlayer.Character.Humanoid:GetState() == Enum.HumanoidStateType.Jumping then
                             RealClone.AssemblyLinearVelocity = Vector3.new(RealClone.AssemblyLinearVelocity.X, OldRoot.AssemblyLinearVelocity.Y, RealClone.AssemblyLinearVelocity.Z)
@@ -3719,10 +3771,10 @@ end)();
                             AntiHitData.Data.Clone = MakeClone()
                         end
 
-                        local PrimaryPart: BasePart = AntiHitData.Data.Clone.PrimaryPart --LocalPlayer.Character.PrimaryPart
-                        AntiHitData.Data.Target = NearestEntity.Entity                        
+                        local PrimaryPart: BasePart = AntiHitData.Data.Clone.PrimaryPart
+                        AntiHitData.Data.Target = NearestEntity.Entity
                         repeat 
-                            local NewEntity =  GetNearestEntity(true)
+                            local NewEntity = GetNearestEntity(true)
                             if NewEntity.Distance > AntiHitData.Settings.Distance or (AntiHitData.Settings.PlayersOnly and not NearestEntity.Data.Player) then
                                 break
                             end
@@ -3730,17 +3782,33 @@ end)();
                         until AntiHitData.Data.CanTeleport or not AntiHitData.Settings.WaitUntilDamage
 
                         if self.Enabled and AntiHitData.Data.Clone and Night:IsAlive(LocalPlayer) and isnetworkowner(LocalPlayer.Character.PrimaryPart) then
-                            if AntiHitData.Settings.StayUp then
-                                PrimaryPart.CFrame = AntiHitData.Data.Clone.Clone.CFrame + Vector3.new(0, AntiHitData.Settings.Height, 0)
-                                task.wait(AntiHitData.Settings.StayUp)
-                                PrimaryPart.Velocity = Vector3.new(0, -1, 0)
-                                PrimaryPart.CFrame = AntiHitData.Data.Clone.Clone.CFrame
-                            else
-                                PrimaryPart.CFrame = AntiHitData.Data.Clone.Clone.CFrame - Vector3.new(0, AntiHitData.Settings.Height / 2, 0)
-                                task.wait(AntiHitData.Settings.StayUp)
-                                PrimaryPart.Velocity = Vector3.new(0, -1, 0)
-                                PrimaryPart.CFrame = AntiHitData.Data.Clone.Clone.CFrame
+                            local StayUp: number = AntiHitData.Settings.StayUp
+                            local StayDown: number = AntiHitData.Settings.StayDown
+
+                            if not AntiHitData.Settings.WaitUntilDamage and AntiHitData.Settings.Dynamic then
+                                local PlayerHealth: number = LocalPlayer.Character.Humanoid.Health or 100
+                                local TargetHealth: number = (NearestEntity.Data and NearestEntity.Data.Humanoid and NearestEntity.Data.Humanoid.Health) or 100
+                                local Difference: number = PlayerHealth - TargetHealth
+
+                                if math.abs(Difference) <= 5 then
+                                    StayUp = AntiHitData.Settings.StayUp
+                                    StayDown = AntiHitData.Settings.StayDown
+                                else
+                                    if Difference > 0 then
+                                        StayDown = math.max(0.1, AntiHitData.Settings.StayDown - AntiHitData.Settings.DownModifier)
+                                        StayUp = math.max(0.1, AntiHitData.Settings.StayUp - (AntiHitData.Settings.UpModifier * 0.5))
+                                    else
+                                        StayDown = math.max(0.1, AntiHitData.Settings.StayDown + (AntiHitData.Settings.DownModifier * 0.5))
+                                        StayUp = math.max(0.1, AntiHitData.Settings.StayUp + AntiHitData.Settings.UpModifier)
+                                    end
+                                end
                             end
+
+                            PrimaryPart.CFrame = AntiHitData.Data.Clone.Clone.CFrame + Vector3.new(0, AntiHitData.Settings.Height, 0)
+                            task.wait(StayUp)
+                            PrimaryPart.Velocity = Vector3.new(0, -1, 0)
+                            PrimaryPart.CFrame = AntiHitData.Data.Clone.Clone.CFrame
+                            task.wait(StayDown)
 
                             AntiHitData.Data.GoUp = not AntiHitData.Data.GoUp
                         end
@@ -3775,7 +3843,7 @@ end)();
         Flag = "AntiHitDistance",
         Min = 1,
         Max = 30,
-        Default = 20,
+        Default = 27,
         CallingFunction = function(self, value: number)
             AntiHitData.Settings.Distance = value
         end
@@ -3790,12 +3858,26 @@ end)();
         end
     })
 
+    local Dynamic, Up, Down
     AntiHit:MiniToggle({
         Name = "Damage Wait",
         Flag = "AntiHitDamageWait",
-        Default = true,
         CallingFunction = function(self, value: boolean)
             AntiHitData.Settings.WaitUntilDamage = value
+            Dynamic:SetVisiblity(not value)
+            Up:SetVisiblity(Dynamic.Enabled)
+            Down:SetVisiblity(Dynamic.Enabled)
+        end
+    })
+
+    Dynamic = AntiHit:MiniToggle({
+        Name = "Dynamic",
+        Flag = "AntiHitDynamic",
+        Default = true,
+        CallingFunction = function(self, value: boolean)
+            AntiHitData.Settings.Dynamic = value
+            Up:SetVisiblity(value)
+            Down:SetVisiblity(value)
         end
     })
 
@@ -3815,10 +3897,46 @@ end)();
         Flag = "AntiHitStayUp",
         Min = 0.1,
         Max = 1,
-        Default = 0.25,
+        Default = 0.2,
         Increment = 0.01,
         CallingFunction = function(self, value: number)
             AntiHitData.Settings.StayUp = value
+        end
+    })
+
+    AntiHit:Slider({
+        Name = "Stay Down",
+        Flag = "AntiHitStayDown",
+        Min = 0.1,
+        Max = 1,
+        Default = 0.1,
+        Increment = 0.01,
+        CallingFunction = function(self, value: number)
+            AntiHitData.Settings.StayDown = value
+        end
+    })
+
+    Up = AntiHit:Slider({
+        Name = "Up Modifier",
+        Flag = "AntiHitUpModifier",
+        Min = 0,
+        Max = 2,
+        Default = 0.5,
+        Increment = 0.1,
+        CallingFunction = function(self, value: number)
+            AntiHitData.Settings.UpModifier = value
+        end
+    })
+
+    Down = AntiHit:Slider({
+        Name = "Down Modifier",
+        Flag = "AntiHitDownModifier",
+        Min = 0,
+        Max = 2,
+        Default = 0.5,
+        Increment = 0.1,
+        CallingFunction = function(self, value: number)
+            AntiHitData.Settings.DownModifier = value
         end
     })
 end)();
@@ -3844,14 +3962,8 @@ end)();
     end
     
     local function Notify(Player, Reason)
-        local Message = string.format("Staff Detected: %s (%s)", Player.Name, Reason)
-        
         if StaffDetectorData.Settings.Mode == "Notify" and Night then
-            Night:CreateNotification({
-                Title = "Staff Detector",
-                Description = Message,
-                Duration = 60
-            })
+            Warning("Staff Detector", string.format("Staff Detected: %s (%s)", Player.Name, Reason), 60)
         else
             StarterGui:SetCore("SendNotification", {
                 Title = "Staff Detector",
@@ -3925,11 +4037,7 @@ end)();
             return true
         else
             if StaffDetectorData.Settings.Mode == "Notify" and Night then
-                Night:CreateNotification({
-                    Title = "Spectator Detector",
-                    Description = string.format("Player %s connected via %s", player.Name, Friend),
-                    Duration = 15
-                })
+                Warning("Spectator Detector", string.format("Player %s connected via %s", player.Name, Friend), 15)
             end
         end
 
@@ -4810,13 +4918,14 @@ end)();
 
                 local function VoidDrop()
                     if AutoVoidDropData.Other.Loop then
-                        task.cancel(AutoVoidDropData.Other.Loop)
+                        AutoVoidDropData.Other.Loop:Disconnect()
                         AutoVoidDropData.Other.Loop = nil
                     end
 
-                    AutoVoidDropData.Other.Loop = task.spawn(function()
+                    local YLevel: number = GetYLevel()
+                    AutoVoidDropData.Other.Loop = self:Connection(task.spawn(function()
                         repeat
-                            if Night:IsAlive(LocalPlayer) and (LocalPlayer.Character:GetAttribute('InflatedBalloons') or 0) <= 0 and LocalPlayer.Character.HumanoidRootPart.Position.Y <= (GetYLevel() - AutoVoidDropData.Settings.Position) then
+                            if Night:IsAlive(LocalPlayer) and (LocalPlayer.Character:GetAttribute('InflatedBalloons') or 0) <= 0 and LocalPlayer.Character.HumanoidRootPart.Position.Y <= (YLevel - AutoVoidDropData.Settings.Position) then
                                 if (AutoVoidDropData.Settings.Owl and not LocalPlayer.Character.HumanoidRootPart:FindFirstChild('OwlLiftForce')) or not AutoVoidDropData.Settings.Owl then
                                     for _, v in AutoVoidDropData.Settings.Items do
                                         local Item = GetItem(v)
@@ -4831,16 +4940,11 @@ end)();
                             end
                             task.wait(AutoVoidDropData.Settings.Delay)
                         until not self.Enabled
-                    end)
+                    end))
                 end
 
                 LocalPlayer.CharacterAdded:Connect(VoidDrop)
                 VoidDrop()
-            else
-                if AutoVoidDropData.Other.Loop then
-                    task.cancel(AutoVoidDropData.Other.Loop)
-                    AutoVoidDropData.Other.Loop = nil
-                end
             end
         end
     })
@@ -5099,7 +5203,7 @@ end)();
                         return
                     end
                 end
-            end), ChestESPData.Connect)
+            end), {ChestESPData.Connect})
         end
         task.spawn(Update)
     end
@@ -5117,7 +5221,7 @@ end)();
                 end
             else
                 for _, v in next, ChestESPData.Connect do
-                    v:Disconnect()
+                    pcall(function() v:Disconnect() end)
                 end
                 ChestESPData.Connect = {}
                 
@@ -5166,8 +5270,8 @@ end)();
     local AutoBalloon = Windows.Utility:CreateModule({
         Name = "Auto Balloon",
         Flag = "AutoBalloon",
-        CallingFunction = function(self, value: boolean)
-            if value then
+        CallingFunction = function(self, enabled: boolean)
+            if enabled then
                 local YLevel: number = GetYLevel()
 
                 repeat
@@ -5183,7 +5287,7 @@ end)();
                                     end
 
                                     if ShouldSwitchItem then
-                                        SwitchItem(Balloons.tool)
+                                        SwitchItem(Balloons.tool, false, true)
                                     end
 
                                     GameData.Utils.Remotes:Get("InflateBalloon"):SendToServer()
@@ -5224,6 +5328,187 @@ end)();
         Flag = "AutoBalloonSwitchItem",
         CallingFunction = function(self, value: boolean)
             ShouldSwitchItem = value
+        end
+    })
+end)();
+
+(function()
+    local Mode: string = "Low"
+    local AutoSwitch: boolean = false
+    local HandCheck: boolean = false
+    local Delay = 0
+
+    local function GetPositions(Pos: Vector3): {Vector3}
+        local Vectors: {Vector3} = {}
+
+        for y = 0, 6, 3 do
+            if y == 6 then
+                Vectors[#Vectors + 1] = Pos + Vector3.new(0, y, 0)
+            else
+                Vectors[#Vectors + 1] = Pos + Vector3.new(0, y, 3)
+                Vectors[#Vectors + 1] = Pos + Vector3.new(0, y, -3)
+                Vectors[#Vectors + 1] = Pos + Vector3.new(-3, y, 0)
+                Vectors[#Vectors + 1] = Pos + Vector3.new(3, y, 0)
+            end
+        end
+
+        return Vectors
+    end
+
+    local function GetAllBlocks(inventory: any): {{Type: string, Tool: any, Health: number}}
+        local Blocks: {{Type: string, Tool: any, Health: number}} = {}
+
+        for _, Item in next, inventory do
+            local Meta = GameData.Utils.ItemMeta[Item.itemType]
+            if Meta.block then
+                local Block = {
+                    Type = Item.itemType,
+                    Tool = Item.tool,
+                    Health = Meta.block.health or 0
+                }
+                Blocks[#Blocks + 1] = Block
+            end
+        end
+
+        table.sort(Blocks, function(x, y)
+            if Mode == "Low" then
+                return x.Health < y.Health
+            else
+                return x.Health > y.Health
+            end
+        end)
+
+        return Blocks
+    end
+
+    local BlockIn = Windows.Utility:CreateModule({
+        Name = "Block In",
+        Flag = "BlockIn",
+        Button = true,
+        CallingFunction = function(self, enabled: boolean)
+            if enabled then
+                local Blocks = GetAllBlocks(GetInventory(LocalPlayer).items)
+
+                if #Blocks == 0 then
+                    Warning("Block In", "No blocks found", 5)
+                    self:SetValue(false)
+                    return
+                end
+
+                local HandItem = GetInventory().hand
+                if HandCheck then
+                    if HandItem and HandItem.tool then
+                        local Meta = GameData.Utils.ItemMeta[HandItem.itemType]
+                        if not Meta or not Meta.block then
+                            Warning("Block In | Hand Check", "Hold the blocks in your hand", 5)
+                            return
+                        end
+                    else
+                        Warning("Block In | Hand Check", "Hold the blocks in your hand", 5)
+                        return
+                    end
+                end
+
+                task.spawn(function()
+                    for _, Block in next, Blocks do
+                        if AutoSwitch then
+                            SwitchItem(Block.Tool)
+                        end
+
+                        for _, Pos in next, GetPositions(LocalPlayer.Character.HumanoidRootPart.Position) do
+                            local IsBlock = GameData.Utils.BlockEngine:getStore():getBlockAt(GameData.Utils.BlockEngine:getBlockPosition(Pos))
+                            if not IsBlock then
+                                local Item = GameData.Utils.BlockPlacer.new(GameData.Utils.BlockClient, Block.Type)
+                                Item:placeBlock(GameData.Utils.BlockEngine:getBlockPosition(Pos))
+                                task.wait(Delay)
+                            end
+                        end
+                    end
+                end)
+            end
+        end
+    })
+
+    BlockIn:Dropdown({
+        Name = "Order",
+        Flag = "BlockInORder",
+        Options = {"Low", "High"},
+        Default = "Low",
+        CallingFunction = function(self, value: string)
+            Mode = value
+        end
+    })
+    
+    BlockIn:MiniToggle({
+        Name = "Auto Switch",
+        Flag = "BlockInAutoSwitch",
+        Default = true,
+        CallingFunction = function(self, value: boolean)
+            AutoSwitch = value
+        end
+    })
+
+    BlockIn:MiniToggle({
+        Name = "Hand Check",
+        Flag = "BlockInHandCheck",
+        CallingFunction = function(self, value: boolean)
+            HandCheck = value
+        end
+    })
+
+    BlockIn:Slider({
+        Name = "Delay",
+        Flag = "BlockInDelay",
+        Min = 0,
+        Max = 1,
+        Default = 0,
+        Increment = 0.01,
+        CallingFunction = function(self, value: number)
+            Delay = value
+        end
+    })
+end)();
+
+(function()
+    Windows.Utility:CreateModule({
+        Name = "Match History",
+        Flag = "MatchHistroy",
+        Button = true,
+        CallingFunction = function(self, enabled: boolean)
+            if enabled then
+                GameData.Utils.MatchHistroyController:requestMatchHistory(LocalPlayer.Name):andThen(function(Data)
+                    if Data then
+                        GameData.Utils.App:openApp({
+                            app = GameData.Utils.MatchHistroyApp,
+                            appId = "MatchHistoryApp",
+                        }, Data)
+                    end
+                end)
+            end
+        end
+    })
+end)();
+
+(function()
+    local OldGet
+    Windows.Utility:CreateModule({
+        Name = "Trap Disabler",
+        Flag = "TrapDisabler",
+        CallingFunction = function(self, enabled: boolean)
+            if enabled then
+                OldGet = GameData.Utils.Remotes.Get
+                GameData.Utils.Remotes.Get = function(Name: string, ...)
+                    if Name == "StepOnSnapTrap" then
+                        return {SendToServer = function() end}
+                    end
+
+                    return OldGet(Name, ...)
+                end
+            else
+                if OldGet then
+                    GameData.Utils.Remotes.Get = OldGet
+                end
+            end
         end
     })
 end)();
