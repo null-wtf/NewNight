@@ -41,6 +41,10 @@ for _, Material in next, Enum.Material:GetEnumItems() do
     table.insert(Materials, Material.Name)
 end
 
+pcall(function()
+	setthreadidentity(8)
+end);
+
 (function()
     local SpeedData = {
         Settings = {
@@ -2576,8 +2580,8 @@ end)();
         CallingFunction = function(self, enabled: boolean)
             if enabled then
                 local Health = {
-                    Current = LocalPlayer.Character:GetAttribute("Health") or 0,
-                    Max = LocalPlayer.Character:GetAttribute("MaxHealth") or 0
+                    Current = (LocalPlayer.Character and LocalPlayer.Character:GetAttribute("Health")) or 0,
+                    Max = (LocalPlayer.Character and LocalPlayer.Character:GetAttribute("MaxHealth")) or 0
                 }
 
                 if Night:IsAlive(LocalPlayer) then
@@ -2603,8 +2607,8 @@ end)();
                         if Night:IsAlive(Nearest.Player) then
                             local Humanoid: Humanoid = Nearest.Player.Character.Humanoid
                             Health = {
-                                Current = LocalPlayer.Character:GetAttribute("Health") or Humanoid.Health,
-                                Max = LocalPlayer.Character:GetAttribute("MaxHealth") or Humanoid.MaxHealth
+                                Current = (LocalPlayer.Character and LocalPlayer.Character:GetAttribute("Health")) or Humanoid.Health,
+                                Max = (LocalPlayer.Character and LocalPlayer.Character:GetAttribute("MaxHealth")) or Humanoid.MaxHealth
                             }
                         end
 
@@ -2615,8 +2619,8 @@ end)();
                         })
                     else
                         Health = {
-                            Current = LocalPlayer.Character:GetAttribute("Health") or 0,
-                            Max = LocalPlayer.Character:GetAttribute("MaxHealth") or 0
+                                Current = (LocalPlayer.Character and LocalPlayer.Character:GetAttribute("Health")) or 0,
+                                Max = (LocalPlayer.Character and LocalPlayer.Character:GetAttribute("MaxHealth")) or 0
                         }
 
                         if Night:IsAlive(LocalPlayer) then
@@ -3065,7 +3069,7 @@ end)();
                 end
 
                 local Atmosphere = Instance.new("Atmosphere", Lighting)
-                local Sky = Instance.new("Sky", Lighting)
+                --local Sky = Instance.new("Sky", Lighting)
                 local Color = Instance.new("ColorCorrectionEffect", Lighting)
 
                 if Mode == "Winter" then
@@ -3083,13 +3087,13 @@ end)();
                     Atmosphere.Offset = 0.25
                     Atmosphere.Color = Color3.fromRGB(255, 255, 255)
 
-                    Sky.SkyboxBk = "http://www.roblox.com/asset/?id=8139677359"
+                    --[[Sky.SkyboxBk = "http://www.roblox.com/asset/?id=8139677359"
                     Sky.SkyboxDn = "http://www.roblox.com/asset/?id=8139677253"
                     Sky.SkyboxFt = "http://www.roblox.com/asset/?id=8139677111"
                     Sky.SkyboxLf = "http://www.roblox.com/asset/?id=8139676988"
                     Sky.SkyboxRt = "http://www.roblox.com/asset/?id=8139676842"
-                    Sky.SkyboxUp = "http://www.roblox.com/asset/?id=8139676647"
-                    Sky.SunAngularSize = 10
+                    Sky.SkyboxUp = "http://www.roblox.com/asset/?id=8139676647"]]
+                    --Sky.SunAngularSize = 10
 
                     Color.Brightness = 0.13
                     Color.Contrast = 0.05
@@ -3110,13 +3114,13 @@ end)();
                     Atmosphere.Offset = 0.3
                     Atmosphere.Color = Color3.fromRGB(255, 255, 255)
 
-                    Sky.SkyboxBk = "http://www.roblox.com/asset/?id=16262356578"
+                    --[[Sky.SkyboxBk = "http://www.roblox.com/asset/?id=16262356578"
                     Sky.SkyboxDn = "http://www.roblox.com/asset/?id=16262358026"
                     Sky.SkyboxFt = "http://www.roblox.com/asset/?id=16262360469"
                     Sky.SkyboxLf = "http://www.roblox.com/asset/?id=16262362003"
                     Sky.SkyboxRt = "http://www.roblox.com/asset/?id=16262363873"
-                    Sky.SkyboxUp = "http://www.roblox.com/asset/?id=16262366016"
-                    Sky.SunAngularSize = 20
+                    Sky.SkyboxUp = "http://www.roblox.com/asset/?id=16262366016"]]
+                    --Sky.SunAngularSize = 20
 
                     Color.Brightness = 0.18
                     Color.Contrast = 0.03
@@ -3137,29 +3141,31 @@ end)();
                     Atmosphere.Offset = 0.2
                     Atmosphere.Color = Color3.fromRGB(255, 255, 255)
 
-                    Sky.SkyboxBk = "http://www.roblox.com/asset/?id=4495864450"
+                    --[[Sky.SkyboxBk = "http://www.roblox.com/asset/?id=4495864450"
                     Sky.SkyboxDn = "http://www.roblox.com/asset/?id=4495864887"
                     Sky.SkyboxFt = "http://www.roblox.com/asset/?id=4495865458"
                     Sky.SkyboxLf = "http://www.roblox.com/asset/?id=4495866035"
                     Sky.SkyboxRt = "http://www.roblox.com/asset/?id=4495866584"
-                    Sky.SkyboxUp = "http://www.roblox.com/asset/?id=4495867486"
-                    Sky.SunAngularSize = 1
+                    Sky.SkyboxUp = "http://www.roblox.com/asset/?id=4495867486"]]
+                    --Sky.SunAngularSize = 1
 
                     Color.Brightness = 0.13
                     Color.Contrast = 0.03
                     Color.Saturation = -0.3
                     Color.TintColor = Color3.fromRGB(120, 85, 200)
+                elseif Mode == "Ocean" then
+                    --loadstring(game:HttpGet("https://raw.githubusercontent.com/null-wtf/NewNight/refs/heads/main/Games/Shaders.luau"))()
                 else
                     Lighting.Ambient = Settings.AmbientColor
                     Lighting.Brightness = Settings.Brightness
                     Lighting.ClockTime = Settings.Time
 
-                    Sky.SkyboxBk = "http://www.roblox.com/asset/?id=" .. Settings.SkyboxBk
+                    --[[Sky.SkyboxBk = "http://www.roblox.com/asset/?id=" .. Settings.SkyboxBk
                     Sky.SkyboxDn = "http://www.roblox.com/asset/?id=" .. Settings.SkyboxDn
                     Sky.SkyboxFt = "http://www.roblox.com/asset/?id=" .. Settings.SkyboxFt
                     Sky.SkyboxLf = "http://www.roblox.com/asset/?id=" .. Settings.SkyboxLf
                     Sky.SkyboxRt = "http://www.roblox.com/asset/?id=" .. Settings.SkyboxRt
-                    Sky.SkyboxUp = "http://www.roblox.com/asset/?id=" .. Settings.SkyboxUp
+                    Sky.SkyboxUp = "http://www.roblox.com/asset/?id=" .. Settings.SkyboxUp]]
 
                     Atmosphere.Density = Settings.Density
                     Atmosphere.Color = Color3.fromRGB(255, 255, 255)
@@ -3170,11 +3176,11 @@ end)();
                     Color.TintColor = Settings.CCColor
                 end
             else
-                for _, v in next, Lighting:GetChildren() do
+                --[[for _, v in next, Lighting:GetChildren() do
                     if v:IsA("Atmosphere") or v:IsA("Sky") or v:IsA("ColorCorrectionEffect") then
                         v:Destroy()
                     end
-                end
+                end]]
 
                 Lighting.Ambient = OldLighting.Ambient
                 Lighting.Brightness = OldLighting.Brightness
@@ -3194,7 +3200,7 @@ end)();
         Name = "Theme",
         Flag = "AtmosphereTheme",
         Default = "Comet",
-        Options = {"Winter", "Comet", "Calm", "Custom"},
+        Options = {"Winter", "Comet", "Calm", "Ocean", "Custom"},
         CallingFunction = function(self, value: string)
             Mode = value
             for _, v in next, Custom do
@@ -3346,4 +3352,369 @@ end)();
             Settings.SkyboxUp = value
         end
     }))
-end)()
+end)();
+
+(function()
+    local Moving: boolean = false
+    local Keys: {[Enum.KeyCode]: boolean} = {
+        [Enum.KeyCode.W] = false,
+        [Enum.KeyCode.A] = false,
+        [Enum.KeyCode.S] = false,
+        [Enum.KeyCode.D] = false,
+        [Enum.KeyCode.Up] = false,
+        [Enum.KeyCode.Down] = false,
+        [Enum.KeyCode.Left] = false,
+        [Enum.KeyCode.Right] = false
+    }
+
+    local function StopMoving()
+        local Root: BasePart = LocalPlayer.Character.HumanoidRootPart
+        local Velo: Vector3 = Root.AssemblyLinearVelocity
+        Root.AssemblyLinearVelocity = Vector3.new(0, Velo.Y, 0)
+        Root.AssemblyAngularVelocity = Vector3.zero
+    end
+
+    Tabs.Movement:CreateModule({
+        Name = "Fast Stop",
+        Flag = "UniversalFastStop",
+        CallingFunction = function(self, enabled: boolean)
+            if enabled then
+                self:Connection(UserInputService.InputBegan:Connect(function(Input: InputObject, Event: boolean)
+                    if Event then return end
+                    if Keys[Input.KeyCode] ~= nil then
+                        Keys[Input.KeyCode] = true
+                        Moving = true
+                    end
+                end))
+
+                self:Connection(UserInputService.InputEnded:Connect(function(Input: InputObject, Event: boolean)
+                    if Event then return end
+                    if Keys[Input.KeyCode] ~= nil then
+                        Keys[Input.KeyCode] = false
+                        for _, Pressed in next, Keys do
+                            if Pressed then
+                                return
+                            end
+                        end
+                        Moving = false
+                    end
+                end))
+
+                self:Connection(RunService.Heartbeat:Connect(function()
+                    if not Moving and Night:IsAlive(LocalPlayer) then
+                        StopMoving()
+                    end
+                end))
+
+                if UserInputService.TouchEnabled or UserInputService.GamepadEnabled then
+                    local LastPos: Vector3 = Vector3.zero
+                    self:Connection(RunService.Heartbeat:Connect(function()
+                        if Night:IsAlive(LocalPlayer) then
+                            local MoveDir: Vector3 = LocalPlayer.Character.Humanoid.MoveDirection
+                            if MoveDir.Magnitude > 0 then
+                                LastPos = MoveDir
+                                Moving = true
+                            else
+                                if Moving and LastPos.Magnitude > 0 then
+                                    StopMoving()
+                                    Moving = false
+                                    LastPos = Vector3.zero
+                                end
+                            end
+                        end
+                    end))
+                end
+            end
+        end
+    })
+end)();
+
+(function()
+    local FakeLagData = {
+        Randomize = true,
+        AnchorTime = 0.5,
+        UnanchorTime = 0.35,
+        Pause = 1,
+        Jitter = 0.15,
+        BurstChance = 0.25,
+        BurstCountMin = 2,
+        BurstCountMax = 5,
+        BurstSpeedMin = 0.05,
+        BurstSpeedMax = 0.12
+    }
+
+    local function Random(a: number, b: number): number
+        return a + math.random() * (b - a)
+    end
+
+    local FakeLag = Tabs.Movement:CreateModule({
+        Name = "Fake Lag",
+        Flag = "UniversalFakeLag",
+        CallingFunction = function(self, enabled: boolean)
+            if enabled then
+                repeat
+                    local Root: BasePart? = Night:IsAlive(LocalPlayer) and LocalPlayer.Character.HumanoidRootPart
+                    if Root then
+                        if math.random() < FakeLagData.BurstChance then
+                            local Count: number = math.random(FakeLagData.BurstCountMin, FakeLagData.BurstCountMax)
+                            for _ = 1, Count do
+                                Root.Anchored = true
+                                task.wait(Random(FakeLagData.BurstSpeedMin, FakeLagData.BurstSpeedMax))
+                                Root.Anchored = false
+                                task.wait(Random(FakeLagData.BurstSpeedMin, FakeLagData.BurstSpeedMax))
+                            end
+                        else
+                            local Anchor: number = FakeLagData.AnchorTime
+                            local Unanchor: number = FakeLagData.UnanchorTime
+                            local Pause: number = FakeLagData.Pause
+
+                            if FakeLagData.Randomize then
+                                Anchor = math.max(0.05, Anchor + Random(-FakeLagData.Jitter, FakeLagData.Jitter))
+                                Unanchor = math.max(0.05, Unanchor + Random(-FakeLagData.Jitter, FakeLagData.Jitter))
+                                Pause = math.max(0.05, Pause + Random(-FakeLagData.Jitter, FakeLagData.Jitter))
+                            end
+
+                            Root.Anchored = true
+                            task.wait(Anchor)
+                            Root.Anchored = false
+                            task.wait(Unanchor + Pause)
+                        end
+                    else
+                        task.wait(0.25)
+                    end
+                    
+                    task.wait()
+                until not self.Enabled
+            end
+        end
+    })
+
+    local Jitter
+    FakeLag:MiniToggle({
+        Name = "Randomize",
+        Flag = "FakeLagRandomize",
+        Default = true,
+        CallingFunction = function(self, value: boolean)
+            FakeLagData.Randomize = value
+            Jitter:SetVisiblity(value)
+        end
+    })
+
+    Jitter = FakeLag:Slider({
+        Name = "Jitter",
+        Flag = "FakeLagJitter",
+        Min = 0,
+        Max = 1,
+        Default = 0.15,
+        Increment = 0.01,
+        CallingFunction = function(self, value: number)
+            FakeLagData.Jitter = value
+        end
+    })
+
+    FakeLag:Slider({
+        Name = "Anchor Time",
+        Flag = "FakeLagAnchorTime",
+        Min = 0.01,
+        Max = 2,
+        Default = 0.5,
+        Increment = 0.01,
+        CallingFunction = function(self, value: number)
+            FakeLagData.AnchorTime = value
+        end
+    })
+
+    FakeLag:Slider({
+        Name = "Unanchor Time",
+        Flag = "FakeLagUnanchorTime",
+        Min = 0.01,
+        Max = 2,
+        Default = 0.35,
+        Increment = 0.01,
+        CallingFunction = function(self, value: number)
+            FakeLagData.UnanchorTime = value
+        end
+    })
+
+    FakeLag:Slider({
+        Name = "Pause",
+        Flag = "FakeLagPause",
+        Min = 0,
+        Max = 3,
+        Default = 1,
+        Increment = 0.01,
+        CallingFunction = function(self, value: number)
+            FakeLagData.Pause = value
+        end
+    })
+
+    FakeLag:Slider({
+        Name = "Burst Chance",
+        Flag = "FakeLagBurstChance",
+        Min = 0,
+        Max = 1,
+        Default = 0.25,
+        Increment = 0.01,
+        CallingFunction = function(self, value: number)
+            FakeLagData.BurstChance = value
+        end
+    })
+
+    FakeLag:Slider({
+        Name = "Burst Count Min",
+        Flag = "FakeLagBurstCountMin",
+        Min = 1,
+        Max = 10,
+        Default = 2,
+        CallingFunction = function(self, value: number)
+            FakeLagData.BurstCountMin = value
+        end
+    })
+
+    FakeLag:Slider({
+        Name = "Burst Count Max",
+        Flag = "FakeLagBurstCountMax",
+        Min = 1,
+        Max = 10,
+        Default = 5,
+        CallingFunction = function(self, value: number)
+            FakeLagData.BurstCountMax = value
+        end
+    })
+
+    FakeLag:Slider({
+        Name = "Burst Speed Min",
+        Flag = "FakeLagBurstSpeedMin",
+        Min = 0.01,
+        Max = 0.2,
+        Default = 0.05,
+        Increment = 0.01,
+        CallingFunction = function(self, value: number)
+            FakeLagData.BurstSpeedMin = value
+        end
+    })
+
+    FakeLag:Slider({
+        Name = "Burst Speed Max",
+        Flag = "FakeLagBurstSpeedMax",
+        Min = 0.01,
+        Max = 0.2,
+        Default = 0.12,
+        Increment = 0.01,
+        CallingFunction = function(self, value: number)
+            FakeLagData.BurstSpeedMax = value
+        end
+    })
+end)();
+
+(function()
+    local SkyCon
+    local RealSky
+    local function Sky()
+        if SkyCon then
+            SkyCon:Disconnect()
+            SkyCon = nil
+        end
+
+        RealSky = Instance.new("Sky", Lighting)
+        RealSky.SkyboxBk = "rbxassetid://79138408362872"
+        RealSky.SkyboxDn = "rbxassetid://79138408362872"
+        RealSky.SkyboxFt = "rbxassetid://79138408362872"
+        RealSky.SkyboxLf = "rbxassetid://79138408362872"
+        RealSky.SkyboxRt = "rbxassetid://79138408362872"
+        RealSky.SkyboxUp = "rbxassetid://79138408362872"
+        
+        SkyCon = Night.Assets.Connections:Add(RealSky.Destroying:Connect(function()
+            Sky()
+        end))
+    end
+
+    Sky()
+    local Connections = {}
+    local LABUBUS = {}
+    local function RemovePlayer(Player: Player)
+        if Connections[Player] then
+            for i,v in Connections[Player] do
+                v:Disconnect()
+            end
+
+            table.clear(Connections[Player])
+        end
+
+        if LABUBUS[Player] then
+            LABUBUS[Player]:Destroy()
+            LABUBUS[Player] = nil
+        end
+    end
+
+    local function LABUBU(Player: Player)
+        task.spawn(function()
+            if not Player then return end
+            if not Connections[Player] then
+                Connections[Player] = {}
+            end
+            
+            if LABUBUS[Player] or not Night:IsAlive(Player) then
+                local Start: number = os.clock()
+                repeat task.wait() until Night:IsAlive(Player) or (os.clock() - Start) > 10
+                if not Night:IsAlive(Player) then
+                    return
+                end
+            end
+
+            local Part = Instance.new("Part", Player.Character)
+            Part.CanCollide = false
+            Part.Size = Vector3.new(5, 10, 5)
+            Part.CFrame = Player.Character.PrimaryPart.CFrame + Vector3.new(0, 2, 0)
+            Part.Anchored = true
+            Part.CastShadow = false
+            LABUBUS[Player] = Part
+
+            for i,v in Enum.NormalId:GetEnumItems() do
+                local Decal = Instance.new("Decal", Part)
+                Decal.Face = v
+                Decal.Texture = "rbxassetid://79138408362872"
+            end
+
+            task.spawn(function()
+                repeat
+                    if Night:IsAlive(Player) and Part then
+                        Part.CFrame = Player.Character.PrimaryPart.CFrame+ Vector3.new(0, 2, 0)
+                    else
+                        RemovePlayer(Player)
+                        break
+                    end
+                    task.wait()
+                until false or not LABUBUS[Player]
+            end)
+
+            Night.Assets.Connections:Add(Player.CharacterAdded:Connect(function()
+                RemovePlayer(Player)
+                task.delay(1, LABUBU, Player)
+            end), {Connections[Player]})
+        end)
+    end
+
+
+    Night.Assets.Connections:Add(Players.PlayerAdded:Connect(LABUBU))
+    Night.Assets.Connections:Add(Players.PlayerRemoving:Connect(RemovePlayer))
+    Night.Assets.Connections:Add(Night.OnUninject.Event:Connect(function()
+        for i,v in Players:GetPlayers() do
+            RemovePlayer(v)
+        end
+
+        if SkyCon then
+            SkyCon:Disconnect()
+        end
+
+        RealSky:Destroy()
+    end))
+
+    for i,v in Players:GetPlayers() do
+        if LABUBUS[v] then
+            RemovePlayer(v)
+        end
+
+        LABUBU(v)
+    end
+end)();
