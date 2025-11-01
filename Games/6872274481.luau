@@ -74,7 +74,8 @@ local GameData = {
         MatchEnd = Instance.new("BindableEvent")
     },
     Data = {
-        KillAuraTarget = nil
+        KillAuraTargets = {},
+        Target = nil
     }
 }
 
@@ -160,10 +161,11 @@ CollectionService:GetInstanceRemovedSignal("block"):Connect(function(inst: Insta
     end
 end)
 
-local function Warning(Title, Description, Duration)
+local function Warning(Title: string, Description: string, Duration: number)
     pcall(function()
 		setthreadidentity(8)
     end)
+
     Night:CreateNotification({
         Title = Title,
         Description = Description,
@@ -426,6 +428,46 @@ local function SwitchItem(Item: Instance)
     end
 end
 
+local function IsPathClear(target: Instance, TargetPart: Part?, Param: RaycastParams): boolean
+    local Start: Vector3 = CurrentCamera.CFrame.Position + CurrentCamera.CFrame.LookVector * 1
+    if TargetPart then
+        local Direction: Vector3 = (TargetPart.Position - Start)
+        local Distance: number = Direction.Magnitude
+        Direction = Direction.Unit * math.min(Distance, 1000)
+        local Ray: RaycastResult = workspace:Raycast(Start, Direction, Param)
+        
+        if not Ray or (Ray.Instance and (Ray.Instance:IsDescendantOf(target) or GameData.Utils.GameQuery:isQueryIgnored(Ray.Instance))) then
+            return true
+        end
+    end
+
+    return false
+end
+
+local function IsPathClear_Position(Target: Instance, Position2: Vector3, Param: RaycastParams): boolean
+    local Start: Vector3 = CurrentCamera.CFrame.Position + CurrentCamera.CFrame.LookVector * 1
+    if Position2 then
+        local Direction: Vector3 = (Position2 - Start)
+        local Distance: number = Direction.Magnitude
+        Direction = Direction.Unit * math.min(Distance, 1000)
+        local Ray: RaycastResult = workspace:Raycast(Start, Direction, Param)
+        
+        if not Ray or (Ray.Instance and (Ray.Instance:IsDescendantOf(Target) or GameData.Utils.GameQuery:isQueryIgnored(Ray.Instance))) then
+            return true
+        end
+    end
+
+    return false
+end
+
+local function GetAngle(CFrame: CFrame, TargetPos: Vector3): number
+    local LookVector: Vector3 = CFrame.LookVector * Vector3.new(1, 0, 1)
+    local Position: Vector3 = CFrame.Position
+
+    local ScaledVector: Vector3 = (TargetPos - Position) * Vector3.new(1, 0, 1)
+    return math.acos(math.clamp(LookVector:Dot(ScaledVector.Unit), -1, 1))
+end
+
 local function GetEntities(): {{Entity: Model, Player: Player?, Health: number, MaxHealth: number, Humanoid: Humanoid, Root: BasePart, Type: string}}
     local Entities = {}
     for i,v in CollectionService:GetTagged("entity") do
@@ -444,7 +486,8 @@ local function GetEntities(): {{Entity: Model, Player: Player?, Health: number, 
     return Entities
 end
 
-local function GetNearestEntity(TeamCheck: boolean): { Data: {Entity: Model, Player: Player?, Health: number, MaxHealth: number, Humanoid: Humanoid, Root: BasePart, Type: string}, Distance: number, Entity: Model? }
+local function GetEntity(Data: {TeamCheck: boolean?, Mode: string?, MaxRange: number?, MaxAngle: number?, Targets: {Players: boolean, Npcs: boolean}, Visible: {Params: RaycastParams?} | boolean}): { Data: {Entity: Model, Player: Player?, Health: number, MaxHealth: number, Humanoid: Humanoid, Root: BasePart, Type: string}, Distance: number, Entity: Model? }
+    Data = Data or {}
     local Entities = GetEntities()
     local Entity = {
         Entity = nil,
@@ -452,16 +495,77 @@ local function GetNearestEntity(TeamCheck: boolean): { Data: {Entity: Model, Pla
         Data = {}
     }
 
+    if not Data.Targets then
+        Data.Targets = {
+            Players = true,
+            Npcs = true
+        }
+    end
+
     for i,v in Entities do
-        if Night:IsAlive(LocalPlayer) and (TeamCheck and v.Entity:GetAttribute("Team") ~= LocalPlayer.Character:GetAttribute("Team") or not TeamCheck) then
-            if Night:IsAlive(v.Entity, true) then
+        if Night:IsAlive(LocalPlayer) and (Data.TeamCheck and v.Entity:GetAttribute("Team") ~= LocalPlayer.Character:GetAttribute("Team") or not Data.TeamCheck) then
+            if Night:IsAlive(v.Entity, true) and ((Data.Targets.Players and v.Player) or (Data.Targets.Npcs and not v.Player)) then
+                if Data.Visible then
+                    if typeof(Data.Visible) == "boolean" then
+                        Data.Visible = {}
+                    end
+
+                    if not Data.Visible.Params then
+                        local RaycastParams: RaycastParams = RaycastParams.new()
+                        RaycastParams.IgnoreWater = true
+                        RaycastParams.FilterType = Enum.RaycastFilterType.Exclude
+                        RaycastParams.FilterDescendantsInstances = CollectionService:GetTagged("entity")
+                    end
+                    
+                    if not IsPathClear(v.Entity, v.Root, Data.Visible.Params) then
+                        continue
+                    end
+                end
+
                 local Distance: number = Night:GetDistanceFrom(LocalPlayer.Character.PrimaryPart.Position, v.Root.Position)
-                if Entity.Distance >= Distance then
-                    Entity = {
-                        Entity = v.Entity,
-                        Distance = Distance,
-                        Data = v
-                    }
+                local Angle: number = GetAngle(LocalPlayer.Character.PrimaryPart.CFrame, v.Root.Position)
+
+                if Data.MaxRange and Distance > Data.MaxRange then
+                    continue
+                end
+
+                if Data.MaxAngle and Angle > (Data.MaxAngle / 2 * math.pi / 180) then
+                    continue
+                end
+
+                v.Angle = Angle
+                if Data.Mode == "Distance" or not Data.Mode then
+                    if Entity.Distance >= Distance then
+                        Entity = {
+                            Entity = v.Entity,
+                            Distance = Distance,
+                            Data = v
+                        }
+                    end
+                elseif Data.Mode == "Lowest Health" then
+                    if (Entity.Data.Health and Entity.Data.Health >= v.Health) or not Entity.Data.Health then
+                        Entity = {
+                            Entity = v.Entity,
+                            Distance = Distance,
+                            Data = v
+                        }
+                    end
+                elseif Data.Mode == "Highest Health" then
+                    if (Entity.Data.Health and Entity.Data.Health <= v.Health) or not Entity.Data.Health then
+                        Entity = {
+                            Entity = v.Entity,
+                            Distance = Distance,
+                            Data = v
+                        }
+                    end
+                elseif Data.Mode == "Angle" then
+                    if (Entity.Data.Angle and Entity.Data.Angle >= Angle) or not Entity.Data.Angle then
+                        Entity = {
+                            Entity = v.Entity,
+                            Distance = Distance,
+                            Data = v
+                        }
+                    end
                 end
             end
         end
@@ -492,30 +596,6 @@ local function GetNearestTaggedItem(Tag: string, Ignore: {Part}?): { Distance: n
     end
 
     return Data
-end
-
-local function IsPathClear(target, TargetPart: Part?, Param: RaycastParams): boolean
-    local Start: Vector3 = CurrentCamera.CFrame.Position + CurrentCamera.CFrame.LookVector * 1
-    if TargetPart then
-        local Direction: Vector3 = (TargetPart.Position - Start)
-        local Distance: number = Direction.Magnitude
-        Direction = Direction.Unit * math.min(Distance, 1000)
-        local Ray: RaycastResult = workspace:Raycast(Start, Direction, Param)
-        
-        if not Ray or (Ray.Instance and (Ray.Instance:IsDescendantOf(target) or GameData.Utils.GameQuery:isQueryIgnored(Ray.Instance))) then
-            return true
-        end
-    end
-
-    return false
-end
-
-local function GetAngle(CFrame: CFrame, TargetPos: Vector3)
-    local LookVector: Vector3 = CFrame.LookVector * Vector3.new(1, 0, 1)
-    local Position: Vector3 = CFrame.Position
-
-    local ScaledVector: Vector3 = (TargetPos - Position) * Vector3.new(1, 0, 1)
-    return math.acos(math.clamp(LookVector:Dot(ScaledVector.Unit), -1, 1))
 end
 
 local function GetViewModel(): Model?
@@ -674,7 +754,7 @@ local function FindWeakestSide(Bed: Part)
     return ActualSide, Side, Health
 end
 
-local function GetNearestBed(): { Bed: Part, Distance: any }
+local function GetNearestBed(IgnoreTeam: boolean?, IgnoreCanBreak: boolean?): { Bed: Part, Distance: any }
     local PlayerTeamId: number = GameData.Utils.TeamUtil.getPlayerTeamId(LocalPlayer)
     local Data = {
         Bed = nil,
@@ -683,7 +763,7 @@ local function GetNearestBed(): { Bed: Part, Distance: any }
 
     for i,v: Part in CollectionService:GetTagged("bed") do
         local TeamId = v:GetAttribute("TeamId")
-        if (TeamId and TeamId ~= PlayerTeamId or not TeamId) and not v:GetAttribute("Team"..tostring(PlayerTeamId).."NoBreak") and Night:IsAlive(LocalPlayer) then
+        if (TeamId and TeamId ~= PlayerTeamId or not TeamId or IgnoreTeam) and (not v:GetAttribute("Team"..tostring(PlayerTeamId).."NoBreak") or IgnoreCanBreak) and Night:IsAlive(LocalPlayer) then
             local Distance = Night:GetDistanceFrom(LocalPlayer.Character.PrimaryPart.Position, v.Position)
             if Data.Distance > Distance then
                 Data = {
@@ -1191,9 +1271,11 @@ end)();
     local KillAuraData = {
         Settings = {
             Range = 27,
+            SwingRange = 32,
             Delay = 0,
             AnimationRestoreTime = 0.5,
             MaxAngle = 360,
+            MaxTargets = 1,
             AutoSwitch = false,
             NoSwing = false,
             HandCheck = false,
@@ -1205,11 +1287,16 @@ end)();
             Particles = false,
             InfRange = false,
             SelectedAnimation = "Night",
+            TargetMode = "Distance",
             BoxColor = Color3.fromRGB(255, 0, 0),
             ParticleColor = Color3.fromRGB(255, 0, 0),
             BoxTransparency = 0.5,
             ParticleRate = 40,
-            ParticleLifeTime = 2
+            ParticleLifeTime = 2,
+            Targets = {
+                Players = false,
+                Npcs = false
+            }
         },
         Data = {
             OldPlayAnimationViewModel = nil,
@@ -1218,6 +1305,7 @@ end)();
             OriginalHandPos = nil,
             TimesRanOnCooldown = 0,
             TriggerHeld = false,
+            LastSetTarget = false,
             Params = RaycastParams.new(),
             LastHit = 0,
             Effects = {
@@ -1305,23 +1393,55 @@ end)();
                             return
                         end
 
-                        local NearestEntity = GetNearestEntity(true)
-                        if NearestEntity.Entity and KillAuraData.Settings.Range >= NearestEntity.Distance and Night:IsAlive(NearestEntity.Entity, true) then
-                            if KillAuraData.Settings.WallCheck then
-                                KillAuraData.Data.Params.FilterType = Enum.RaycastFilterType.Exclude
-                                KillAuraData.Data.Params.FilterDescendantsInstances = CollectionService:GetTagged("entity")
+                        local NearestEntity
+                        local GotFromTargets: boolean = false
+                        local CurrentTargetData = {
+                            Distance = math.huge,
+                            Entity = nil
+                        }
 
-                                if not IsPathClear(NearestEntity.Entity, NearestEntity.Entity.PrimaryPart, KillAuraData.Data.Params) then
-                                    task.wait()
-                                    return
-                                end
+                        for i,v in GameData.Data.KillAuraTargets do
+                            local NewAngle: number = GetAngle(LocalPlayer.Character.PrimaryPart.CFrame, v.Entity.PrimaryPart.Position)
+                            if v.Entity and Night:IsAlive(v.Entity, true) then
+                                if NewAngle < (KillAuraData.Settings.MaxAngle / 2 * math.pi / 180) then
+                                    local Distance: number = Night:GetDistanceFrom(LocalPlayer.Character.PrimaryPart.Position, v.Entity.PrimaryPart.Position)
+                                    if (Distance > KillAuraData.Settings.Range and Distance > KillAuraData.Settings.SwingRange) then
+                                        table.remove(GameData.Data.KillAuraTargets, i)
+                                        continue
+                                    end
+
+                                    if CurrentTargetData.Distance >= Distance then
+                                        v.Distance = Distance
+                                        v.Data.Angle = NewAngle
+
+                                        CurrentTargetData = v
+                                    end
+                                else
+                                    table.remove(GameData.Data.KillAuraTargets, i)
+                                end 
+                            else
+                                table.remove(GameData.Data.KillAuraTargets, i)
                             end
+                        end
 
-                            if GetAngle(LocalPlayer.Character.PrimaryPart.CFrame, NearestEntity.Entity.PrimaryPart.Position) > (KillAuraData.Settings.MaxAngle / 2 * math.pi / 180) then
-                                task.wait()
-                                return
-                            end 
+                        if CurrentTargetData.Entity then
+                            NearestEntity = CurrentTargetData
+                            GotFromTargets = true
+                        else
+                            local Range: number = (KillAuraData.Settings.SwingRange > KillAuraData.Settings.Range and KillAuraData.Settings.SwingRange) or KillAuraData.Settings.Range
+                            NearestEntity = GetEntity({
+                                TeamCheck = true, 
+                                MaxRange = Range,
+                                MaxAngle = KillAuraData.Settings.MaxAngle,
+                                Mode = KillAuraData.Settings.TargetMode,
+                                Targets = KillAuraData.Settings.Targets,
+                                Visible = KillAuraData.Settings.WallCheck
+                            })
+                        end
 
+                        if NearestEntity.Entity then
+                            KillAuraData.Data.LastSetTarget = true
+                            GameData.Data.Target = NearestEntity
                             local HandItem = GetInventory().hand
                             if KillAuraData.Settings.HandCheck then
                                 if HandItem and HandItem.tool then
@@ -1336,7 +1456,23 @@ end)();
                                 end
                             end
 
-                            GameData.Data.KillAuraTarget = NearestEntity
+                            if not GotFromTargets then
+                                local Found: boolean = false
+                                for i,v in GameData.Data.KillAuraTargets do
+                                    if v.Entity and v.Entity == NearestEntity.Entity then
+                                        Found = true
+                                    end
+                                end
+
+                                if not Found then
+                                    table.insert(GameData.Data.KillAuraTargets, NearestEntity)
+                                end
+
+                                if #GameData.Data.KillAuraTargets >= KillAuraData.Settings.MaxTargets then
+                                    table.remove(GameData.Data.KillAuraTargets, 1)
+                                end
+                            end
+
                             if KillAuraData.Settings.AutoSwitch and (not HandItem or HandItem and (not HandItem.tool or HandItem.tool ~= Sword.Item)) then
                                 SwitchItem(Sword.Item, true)
                             end
@@ -1379,25 +1515,27 @@ end)();
                                 end)()
                             end
 
-                            local HitPos: Vector3 = (math.clamp(NearestEntity.Distance - 14.4, 10, 30) * (NearestEntity.Entity.PrimaryPart.Position - LocalPlayer.Character.PrimaryPart.Position).Unit) + LocalPlayer.Character.PrimaryPart.Position
-                            GameData.Utils.Remotes:Get("SwordHit"):SendToServer({
-                                entityInstance = NearestEntity.Entity,
-                                chargedAttack = {chargeRatio = 0},
-                                validate = {
-                                    targetPosition = {value = NearestEntity.Data.Root.Position},
-                                    raycast = {
-                                        cursorDirection = {value = CFrame.lookAlong(HitPos, NearestEntity.Data.Root.Position).LookVector},
-                                        cameraPosition = {value = HitPos}
+                            if KillAuraData.Settings.Range >= NearestEntity.Distance then
+                                local HitPos: Vector3 = (math.clamp(NearestEntity.Distance - 14.4, 10, 30) * (NearestEntity.Entity.PrimaryPart.Position - LocalPlayer.Character.PrimaryPart.Position).Unit) + LocalPlayer.Character.PrimaryPart.Position
+                                GameData.Utils.Remotes:Get("SwordHit"):SendToServer({
+                                    entityInstance = NearestEntity.Entity,
+                                    chargedAttack = {chargeRatio = 0},
+                                    validate = {
+                                        targetPosition = {value = NearestEntity.Data.Root.Position},
+                                        raycast = {
+                                            cursorDirection = {value = CFrame.lookAlong(HitPos, NearestEntity.Data.Root.Position).LookVector},
+                                            cameraPosition = {value = HitPos}
+                                        },
+                                        selfPosition = {value = HitPos}
                                     },
-                                    selfPosition = {value = HitPos}
-                                },
-                                weapon = Sword.Item
-                            })
+                                    weapon = Sword.Item
+                                })
+                            end
 
                             if not KillAuraData.Settings.NoSwing then
                                 GameData.Utils.Animation:playAnimation(LocalPlayer, GameData.Utils.ProdAnimations[GameData.Utils.AnimationType.SWORD_SWING])
                             end
-                            
+
                             if KillAuraData.Settings.UseAnimation then
                                 coroutine.wrap(function()
                                     local ViewModel: Model = GetViewModel()
@@ -1434,7 +1572,11 @@ end)();
 
                             KillAuraData.Data.LastHit = os.clock()
                         else
-                            GameData.Data.KillAuraTarget = nil
+                            if KillAuraData.Data.LastSetTarget then
+                                GameData.Data.Target = nil
+                                KillAuraData.Data.LastSetTarget = false
+                            end
+
                             KillAuraData.Data.AnimationPlaying = false
 
                             for i,v in KillAuraData.Data.Effects do
@@ -1459,7 +1601,12 @@ end)();
                     end
                 end))
             else
-                GameData.Data.KillAuraTarget = nil
+                if KillAuraData.Data.LastSetTarget then
+                    GameData.Data.Target = nil
+                    KillAuraData.Data.LastSetTarget = false
+                end
+
+                table.clear(GameData.Data.KillAuraTargets)
                 KillAuraData.Data.AnimationPlaying = false
 
                 for i,v in KillAuraData.Data.Effects do
@@ -1519,6 +1666,39 @@ end)();
             KillAuraData.Settings.MaxAngle = value
         end
     })
+
+    KillAura:Slider({
+        Name = "Max Targets",
+        Flag = "KillAuraMaxTargets",
+        Min = 1,
+        Max = 10,
+        Default = 1,
+        CallingFunction = function(self, value: number)
+            KillAuraData.Settings.MaxTargets = value
+        end
+    })
+
+    KillAura:Dropdown({
+        Name = "Targets",
+        Flag = "KillAuraTargets",
+        Default = {"Players", "Npcs"},
+        Options = {"Players", "Npcs"},
+        MaxLimit = 2,
+        MinLimit = 0,
+        CallingFunction = function(self, value: {})
+            KillAuraData.Settings.Targets = value
+        end
+    })  
+    
+    KillAura:Dropdown({
+        Name = "Target Mode",
+        Flag = "KillAuraTargetMode",
+        Default = "Distance",
+        Options = {"Distance", "Angle", "Lowest Health", "Highest Health"},
+        CallingFunction = function(self, value: string)
+            KillAuraData.Settings.TargetMode = value
+        end
+    })    
 
     KillAura:Slider({
         Name = "Delay",
@@ -1698,7 +1878,11 @@ end)();
             WallCheck = false,
             UseTriggerButton = false,
             TargetPart = "HumanoidRootPart",
-            CircleColor = Color3.fromRGB(255, 0, 0)
+            CircleColor = Color3.fromRGB(255, 0, 0),
+            Targets = {
+                Players = false,
+                Npcs = false
+            }
         },
         Data = {
             RayParams = RaycastParams.new(),
@@ -1743,7 +1927,8 @@ end)();
                     local NearestToMouse: {DistanceFromMouse: number, DistanceFromPlayer: number, Player: Player?, Character: Model?} = Night:GetNerestPlayerToMouse({
                         TeamCheck = AimbotData.Settings.TeamCheck,
                         Exclude = {LocalPlayer},
-                        Extras = AllEntities
+                        Extras = AllEntities,
+                        Targets = AimbotData.Settings.Targets
                     })
 
                     if NearestToMouse.Character then
@@ -1807,6 +1992,18 @@ end)();
             AimbotData.Settings.TargetPart = Value
         end
     })
+
+    Aimbot:Dropdown({
+        Name = "Targets",
+        Flag = "AimbotTargets",
+        Default = {"Players", "Npcs"},
+        Options = {"Players", "Npcs"},
+        MaxLimit = 2,
+        MinLimit = 0,
+        CallingFunction = function(self, value: {})
+            AimbotData.Settings.Targets = value
+        end
+    })  
 
     Aimbot:Slider({
         Name = "Aim Speed",
@@ -1922,6 +2119,10 @@ end)();
 (function()
     local TeamCheck = false
     local Distance = 30
+    local Targets = {
+        Players = false,
+        Npcs = false
+    }
 
     local TargetHud = Windows.Render:CreateModule({
         Name = "Target HUD",
@@ -1935,22 +2136,30 @@ end)();
 
                 Night:GetTargetHud(true, {Player = LocalPlayer, Health = Health})
                 repeat
-                    local Nearest = GetNearestEntity(TeamCheck)
-                    if Nearest.Entity and Distance >= Nearest.Distance then
+                    local Target = GameData.Data.Target
+                    if not Target or not Target.Entity then
+                        Target = GetEntity({
+                            TeamCheck = TeamCheck,
+                            MaxRange = Distance,
+                            Targets = Targets
+                        })
+                    end
+
+                    if Target.Entity then
                         Health = {
-                            Current = math.round(Nearest.Entity:GetAttribute("Health")) or 0,
-                            Max = math.round(Nearest.Entity:GetAttribute("MaxHealth")) or 0
+                            Current = math.round(Target.Entity:GetAttribute("Health")) or 0,
+                            Max = math.round(Target.Entity:GetAttribute("MaxHealth")) or 0
                         }
 
-                        local Display: string = Nearest.Entity.Humanoid.DisplayName
+                        local Display: string = Target.Entity.Humanoid.DisplayName
                         if Display == "" then
-                            Display = Nearest.Entity.Name
+                            Display = Target.Entity.Name
                         end
 
                         Night:GetTargetHud():Update({
-                            Player = Nearest.Data.Player,
+                            Player = Target.Data.Player,
                             UserData = {
-                                Name = Nearest.Entity.Name, 
+                                Name = Target.Entity.Name, 
                                 DisplayName = Display, 
                                 ProfilePic = "",
                             },
@@ -1959,8 +2168,8 @@ end)();
                         })
                     else
                         Health = {
-                            Current = math.round(LocalPlayer.Character:GetAttribute("Health")) or 0,
-                            Max = math.round(LocalPlayer.Character:GetAttribute("MaxHealth")) or 0
+                            Current = (LocalPlayer.Character and math.round(LocalPlayer.Character:GetAttribute("Health"))) or 0,
+                            Max = (LocalPlayer.Character and math.round(LocalPlayer.Character:GetAttribute("MaxHealth"))) or 0
                         }
 
                         Night:GetTargetHud():Update({
@@ -1987,6 +2196,18 @@ end)();
             Distance = value
         end
     })
+
+    TargetHud:Dropdown({
+        Name = "Targets",
+        Flag = "TargetHUDTargets",
+        Default = {"Players", "Npcs"},
+        Options = {"Players", "Npcs"},
+        MaxLimit = 2,
+        MinLimit = 0,
+        CallingFunction = function(self, value: {})
+            Targets = value
+        end
+    })  
 
     TargetHud:MiniToggle({
         Name = "Team Check",
@@ -2645,7 +2866,11 @@ end)();
             Radius = 1000,
             TargetPart = "HumanoidRootPart",
             Color = Color3.fromRGB(255, 0, 0),
-            Blacklisted = {}
+            Blacklisted = {},
+            Targets = {
+                Players = false,
+                Npcs = false
+            }
         },
         Data = {
             RayParams = RaycastParams.new(),
@@ -2690,7 +2915,8 @@ end)();
                     local NearestToMouse = Night:GetNerestPlayerToMouse({
                         TeamCheck = true,
                         Exclude = {LocalPlayer},
-                        Extras = AllEntities
+                        Extras = AllEntities,
+                        Targets = ProjAimbotData.Settings.Targets
                     })
 
                     if NearestToMouse.Character then
@@ -2790,6 +3016,18 @@ end)();
             ProjAimbotData.Settings.TargetPart = Value
         end
     })
+
+    ProjAimbot:Dropdown({
+        Name = "Targets",
+        Flag = "ProjAimbotTargets",
+        Default = {"Players", "Npcs"},
+        Options = {"Players", "Npcs"},
+        MaxLimit = 2,
+        MinLimit = 0,
+        CallingFunction = function(self, value: {})
+            ProjAimbotData.Settings.Targets = value
+        end
+    })  
 
     local FovColor = ProjAimbot:ColorSlider({
         Name = "FOV Color",
@@ -2900,11 +3138,17 @@ end)();
             Speed = 100,
             Power = 50,
             Delay = 0.1,
+            MaxAngle = 360,
+            TargetMode = "Distance",
             TP = false,
             WallCheck = false,
-            PlayersOnly = false
+            Targets = {
+                Players = false,
+                Npcs = false
+            }
         },
         Data = {
+            LastSetTarget = false,
             DelayProj = {},
             ProjNames = {arrow = true, snowball = true},
             Params = RaycastParams.new()
@@ -3006,61 +3250,89 @@ end)();
             if enabled then
                 repeat
                     if Night:IsAlive(LocalPlayer) then
-                        local Target = GetNearestEntity(true)
-                        if Target.Entity and Target.Distance <= ProjectileAura.Settings.Range and Night:IsAlive(Target.Entity, true) and (ProjectileAura.Settings.PlayersOnly and Target.Data.Player or not ProjectileAura.Settings.PlayersOnly) then
+                        local Target = GetEntity({
+                            TeamCheck = true,
+                            MaxRange = ProjectileAura.Settings.Range,
+                            MaxAngle = ProjectileAura.Settings.MaxAngle,
+                            Visible = ProjectileAura.Settings.WallCheck,
+                            Targets = ProjectileAura.Settings.Targets,
+                            Mode = ProjectileAura.Settings.TargetMode
+                        })
+
+                        if Target.Entity and Night:IsAlive(Target.Entity, true) then
                             local Pos = LocalPlayer.Character.PrimaryPart.Position
                             local Tools = GetTools()
 
-                            if ProjectileAura.Settings.WallCheck then
-                                ProjectileAura.Data.Params.FilterType = Enum.RaycastFilterType.Exclude
-                                ProjectileAura.Data.Params.FilterDescendantsInstances = CollectionService:GetTagged("entity")
+                            if #Tools > 0 then
+                                GameData.Data.Target = Target
+                                ProjectileAura.Data.LastSetTarget = true
 
-                                if not IsPathClear(Target.Entity, Target.Entity.PrimaryPart, ProjectileAura.Data.Params) then
-                                    task.wait()
-                                    continue
-                                end
-                            end
+                            
+                                for i = 1, #Tools do
+                                    local Obj = Tools[i]
+                                    local ItemType = Obj.Item.itemType
 
-                            for i = 1, #Tools do
-                                local Obj = Tools[i]
-                                local ItemType = Obj.Item.itemType
+                                    if Windows.Movement.Modules.LongJump.Enabled then
+                                        if ProjectileAura.Data.LastSetTarget then
+                                            GameData.Data.Target = nil
+                                            ProjectileAura.Data.LastSetTarget = false
+                                        end
+                                        task.wait()
+                                        continue
+                                    end
 
-                                if (ProjectileAura.Data.DelayProj[ItemType] or 0) < os.clock() and not GameData.Data.KillAuraTarget and not Windows.Movement.Modules.LongJump.Enabled then
-                                    local ProjData = GameData.Utils.ProjMeta[Obj.Proj]
-                                    local LaunchVel = ProjData.launchVelocity
-                                    local AimPos = Aim(Pos, LaunchVel, ProjData.gravitationalAcceleration or 196.2, Target.Entity.PrimaryPart.Position, Target.Entity.PrimaryPart.Velocity, Target.Entity.Humanoid.HipHeight)
-                                    
-                                    if AimPos then
-                                        SwitchItem(Obj.Item.tool, true)
-                                        coroutine.wrap(function()
-                                            local LookVec = (CFrame.new(Pos, AimPos)).LookVector * LaunchVel
-
-                                            if not ProjectileAura.Settings.TP then
-                                                GameData.Utils.Projectile:createLocalProjectile(ProjData, Obj.Ammo, Obj.Proj, CFrame.new(Pos, AimPos).Position, HttpService:GenerateGUID(true), LookVec, {drawDurationSeconds = 1})
+                                    if (ProjectileAura.Data.DelayProj[ItemType] or 0) < os.clock() then
+                                        local ProjData = GameData.Utils.ProjMeta[Obj.Proj]
+                                        local LaunchVel = ProjData.launchVelocity
+                                        local AimPos = Aim(Pos, LaunchVel, ProjData.gravitationalAcceleration or 196.2, Target.Entity.PrimaryPart.Position, Target.Entity.PrimaryPart.Velocity, Target.Entity.Humanoid.HipHeight)
+                                        
+                                        if AimPos then
+                                            if ProjectileAura.Settings.WallCheck and not IsPathClear_Position(Target.Entity, AimPos, ProjectileAura.Data.Params) then
+                                                task.wait()
+                                                continue
                                             end
 
-                                            GameData.Utils.Remotes:Get("ProjectileFire"):CallServerAsync(
-                                                Obj.Item.tool, Obj.Ammo, Obj.Proj,
-                                                CFrame.new(Pos, AimPos).Position,
-                                                Pos, LookVec,
-                                                HttpService:GenerateGUID(true),
-                                                {drawDurationSec = ProjectileAura.Settings.Speed / 100, shotId = HttpService:GenerateGUID(false)},
-                                                workspace:GetServerTimeNow() - 0.01 * ((ProjectileAura.Settings.Power - 5) / 2)
-                                            ):andThen(function(Ammo: Instance)
-                                                CheckProj(Ammo, Obj)
-                                            end)
-                                        end)()
-                                        
-                                        ProjectileAura.Data.DelayProj[ItemType] = os.clock() + Obj.Meta.fireDelaySec
-                                        task.wait(ProjectileAura.Settings.Delay)
+                                            SwitchItem(Obj.Item.tool, true)
+                                            coroutine.wrap(function()
+                                                local LookVec = (CFrame.new(Pos, AimPos)).LookVector * LaunchVel
+
+                                                if not ProjectileAura.Settings.TP then
+                                                    GameData.Utils.Projectile:createLocalProjectile(ProjData, Obj.Ammo, Obj.Proj, CFrame.new(Pos, AimPos).Position, HttpService:GenerateGUID(true), LookVec, {drawDurationSeconds = 1})
+                                                end
+
+                                                GameData.Utils.Remotes:Get("ProjectileFire"):CallServerAsync(
+                                                    Obj.Item.tool, Obj.Ammo, Obj.Proj,
+                                                    CFrame.new(Pos, AimPos).Position,
+                                                    Pos, LookVec,
+                                                    HttpService:GenerateGUID(true),
+                                                    {drawDurationSec = ProjectileAura.Settings.Speed / 100, shotId = HttpService:GenerateGUID(false)},
+                                                    workspace:GetServerTimeNow() - 0.01 * ((ProjectileAura.Settings.Power - 5) / 2)
+                                                ):andThen(function(Ammo: Instance)
+                                                    CheckProj(Ammo, Obj)
+                                                end)
+                                            end)()
+                                            
+                                            ProjectileAura.Data.DelayProj[ItemType] = os.clock() + Obj.Meta.fireDelaySec
+                                            task.wait(ProjectileAura.Settings.Delay)
+                                        end
                                     end
                                 end
+                            end
+                        else
+                            if ProjectileAura.Data.LastSetTarget then
+                                GameData.Data.Target = nil
+                                ProjectileAura.Data.LastSetTarget = false
                             end
                         end
                         task.wait(ProjectileAura.Settings.Delay)
                     end
                     task.wait()
                 until not self.Enabled
+            else
+                if ProjectileAura.Data.LastSetTarget then
+                    GameData.Data.Target = nil
+                    ProjectileAura.Data.LastSetTarget = false
+                end
             end
         end
     })
@@ -3110,14 +3382,38 @@ end)();
         end
     })
 
-    ProjAura:MiniToggle({
-        Name = "Players Only",
-        Flag = "ProjectileAuraPlayersOnly",
-        Default = true,
-        CallingFunction = function(self, value: boolean)
-            ProjectileAura.Settings.PlayersOnly = value
+    ProjAura:Slider({
+        Name = "Max Angle",
+        Flag = "ProjectileAuraMaxAngle",
+        Min = 1,
+        Max = 360,
+        Default = 360,
+        CallingFunction = function(self, value: number)
+            ProjectileAura.Settings.MaxAngle = value
         end
     })
+
+    ProjAura:Dropdown({
+        Name = "Targets",
+        Flag = "ProjectileAuraTargets",
+        Default = {"Players", "Npcs"},
+        Options = {"Players", "Npcs"},
+        MaxLimit = 2,
+        MinLimit = 0,
+        CallingFunction = function(self, value: {})
+            ProjectileAura.Settings.Targets = value
+        end
+    })  
+
+    ProjAura:Dropdown({
+        Name = "Target Mode",
+        Flag = "ProjectileAuraTargetMode",
+        Default = "Distance",
+        Options = {"Distance", "Angle", "Lowest Health", "Highest Health"},
+        CallingFunction = function(self, value: string)
+            ProjectileAura.Settings.TargetMode = value
+        end
+    })    
 
     ProjAura:MiniToggle({
         Name = "Wall Check",
@@ -3227,7 +3523,7 @@ end)();
                                 end
                             end
 
-                            RealSpeed = CombatCheck and GameData.Data.KillAuraTarget and (RealSpeed / 2) or RealSpeed
+                            RealSpeed = CombatCheck and 0 < #GameData.Data.KillAuraTargets and (RealSpeed / 2) or RealSpeed
                             PrimaryPart.AssemblyLinearVelocity = Vector3.new(Humanoid.MoveDirection.X * RealSpeed, Height, Humanoid.MoveDirection.Z * RealSpeed)      
                         end
                         
@@ -3257,7 +3553,7 @@ end)();
                         end
 
                         local MoveDirection = LocalPlayer.Character.PrimaryPart.CFrame.LookVector
-                        local LJSpeed = CombatCheck and GameData.Data.KillAuraTarget and (VeloSpeed / 2) or VeloSpeed
+                        local LJSpeed = CombatCheck and 0 < #GameData.Data.KillAuraTargets and (VeloSpeed / 2) or VeloSpeed
 
                         LocalPlayer.Character.HumanoidRootPart.AssemblyLinearVelocity = (MoveDirection * (LJSpeed + GetSpeedMultiplier())) + Vector3.new(0, LocalPlayer.Character.HumanoidRootPart.AssemblyLinearVelocity.Y, 0)
                         if LocalPlayer.Character.Humanoid.FloorMaterial == Enum.Material.Air then
@@ -3476,7 +3772,7 @@ end)();
 
                     if Diamonds and TeamUpgradeShop.Item and Distance >= TeamUpgradeShop.Distance and TeamUpgradeShop.Id then
                         for i,v in SelectedUpgrades do
-                            local Id: string, Item = GetUpgradeFromName(v)
+                            local Id: string, Item = GetUpgradeFromName(i)
                             if Id and Item then
                                 local Current = GameData.Utils.TeamUpgradesController.currentUpgrades[Id]
                                 local NextUpgrade = 1
@@ -3570,7 +3866,7 @@ end)();
 
                     local ItemShop = GetNearestTaggedItem("BedwarsItemShop")
                     if ItemShop.Item and Distance >= ItemShop.Distance and ItemShop.Id then
-                        if table.find(SelectedItems, "Sword") then
+                        if SelectedItems.Sword then
                             local NextSword = GetNextSword()
                             if NextSword then
                                 local Currency = GetItem(NextSword.currency)
@@ -3586,7 +3882,7 @@ end)();
                             end
                         end
 
-                        if table.find(SelectedItems, "Armor") then
+                        if SelectedItems.Armor then
                             local NextArmor = GetNextArmor()
                             if NextArmor then
                                 local Currency = GetItem(NextArmor.currency)
@@ -3714,11 +4010,14 @@ end)();
             Height = 100,
             StayUp = 0.2,
             StayDown = 0.1,
-            PlayersOnly = false,
             WaitUntilDamage = false,
             Dynamic = false,
             UpModifier = 0.5,
-            DownModifier = 0.5
+            DownModifier = 0.5,
+            Targets = {
+                Players = false,
+                Npcs = false
+            }
         },
         Data = {
             Target = nil,
@@ -3750,14 +4049,17 @@ end)();
                         local RealClone: BasePart = AntiHitData.Data.Clone.Clone
                         local OldRoot: BasePart = AntiHitData.Data.Clone.PrimaryPart
                         RealClone.CFrame = CFrame.lookAlong(Vector3.new(OldRoot.Position.X, RealClone.Position.Y, OldRoot.Position.Z), OldRoot.CFrame.LookVector)
-                        if LocalPlayer.Character.Humanoid:GetState() == Enum.HumanoidStateType.Jumping then
-                            RealClone.AssemblyLinearVelocity = Vector3.new(RealClone.AssemblyLinearVelocity.X, OldRoot.AssemblyLinearVelocity.Y, RealClone.AssemblyLinearVelocity.Z)
-                        end
+                        RealClone.AssemblyLinearVelocity = Vector3.new(RealClone.AssemblyLinearVelocity.X, OldRoot.AssemblyLinearVelocity.Y + (LocalPlayer.Character.Humanoid.HipHeight * 1.6), RealClone.AssemblyLinearVelocity.Z)
                     end
                 end))
 
                 repeat
-                    local NearestEntity = GetNearestEntity(true)
+                    local NearestEntity = GetEntity({
+                        TeamCheck = true,
+                        MaxRange = AntiHitData.Settings.Distance,
+                        Targets = AntiHitData.Settings.Targets
+                    })
+
                     local Fly = Windows.Movement.Modules.Fly
                     local LongJump = Windows.Movement.Modules.LongJump
                     
@@ -3766,7 +4068,7 @@ end)();
                         continue
                     end
 
-                    if Night:IsAlive(LocalPlayer) and NearestEntity.Entity and AntiHitData.Settings.Distance >= NearestEntity.Distance and (AntiHitData.Settings.PlayersOnly and NearestEntity.Data.Player or not AntiHitData.Settings.PlayersOnly) then
+                    if Night:IsAlive(LocalPlayer) and NearestEntity.Entity then
                         if not AntiHitData.Data.Clone then
                             AntiHitData.Data.Clone = MakeClone()
                         end
@@ -3774,8 +4076,13 @@ end)();
                         local PrimaryPart: BasePart = AntiHitData.Data.Clone.PrimaryPart
                         AntiHitData.Data.Target = NearestEntity.Entity
                         repeat 
-                            local NewEntity = GetNearestEntity(true)
-                            if NewEntity.Distance > AntiHitData.Settings.Distance or (AntiHitData.Settings.PlayersOnly and not NearestEntity.Data.Player) then
+                            local NewEntity = GetEntity({
+                                TeamCheck = true,
+                                MaxRange = AntiHitData.Settings.Distance,
+                                Targets = AntiHitData.Settings.Targets
+                            })
+
+                            if not NewEntity.Entity then
                                 break
                             end
                             task.wait() 
@@ -3849,14 +4156,17 @@ end)();
         end
     })
 
-    AntiHit:MiniToggle({
-        Name = "Players Only",
-        Flag = "AntiHitPlayersOnly",
-        Default = true,
-        CallingFunction = function(self, value: boolean)
-            AntiHitData.Settings.PlayersOnly = value
+    AntiHit:Dropdown({
+        Name = "Targets",
+        Flag = "AntiHitTargets",
+        Default = {"Players", "Npcs"},
+        Options = {"Players", "Npcs"},
+        MaxLimit = 2,
+        MinLimit = 0,
+        CallingFunction = function(self, value: {})
+            AntiHitData.Settings.Targets = value
         end
-    })
+    })  
 
     local Dynamic, Up, Down
     AntiHit:MiniToggle({
@@ -4552,6 +4862,11 @@ end)();
     local ActivationDistance: number = 28
     local ActivationDelay: number = 0
     local CanSwitchItem: boolean = false
+    local MaxAngle: number = 360
+    local Targets: {[string]: boolean} = {
+        Players = false,
+        Npcs = false
+    }
 
     local AutoKit = Windows.Utility:CreateModule({
         Name = "Auto Kit",
@@ -4597,8 +4912,14 @@ end)();
                             })
                         end
                     elseif SelectedKit == "Kaida" then
-                        local NearestEntity = GetNearestEntity(true)
-                        if NearestEntity.Entity and ActivationDistance >= NearestEntity.Distance and GameData.Utils.SummonerKitBalance.CLAW_COOLDOWN < (workspace:GetServerTimeNow() - GameData.Utils.ClawHandController.lastAttackTime) then
+                        local NearestEntity = GetEntity({
+                            TeamCheck = true,
+                            MaxRange  = ActivationDistance,
+                            MaxAngle = MaxAngle,
+                            Targets = Targets
+                        })
+
+                        if NearestEntity.Entity and GameData.Utils.SummonerKitBalance.CLAW_COOLDOWN < (workspace:GetServerTimeNow() - GameData.Utils.ClawHandController.lastAttackTime) then
                             local Claw = GetItem("summoner_claw", true)
                             if Claw and Claw.tool then
                                 if CanSwitchItem then
@@ -4632,7 +4953,7 @@ end)();
         end
     })
 
-    local SwitchItemToggle
+    local SwitchItemToggle, TargetsOption, MaxAngleOption
     AutoKit:Dropdown({
         Name = "Kit",
         Flag = "AutoKitSelectedKit",
@@ -4641,8 +4962,22 @@ end)();
         CallingFunction = function(self, value: string)
             SelectedKit = value
             SwitchItemToggle:SetVisiblity(value == "Kaida")
+            TargetsOption:SetVisiblity(value == "Kaida")
+            MaxAngleOption:SetVisiblity(value == "Kaida")
         end
     })
+
+    TargetsOption = AutoKit:Dropdown({
+        Name = "Targets",
+        Flag = "AutoKitTargets",
+        Default = {"Players", "Npcs"},
+        Options = {"Players", "Npcs"},
+        MaxLimit = 2,
+        MinLimit = 0,
+        CallingFunction = function(self, value: {})
+            Targets = value
+        end
+    })  
 
     SwitchItemToggle = AutoKit:MiniToggle({
         Name = "Switch Item",
@@ -4650,6 +4985,17 @@ end)();
         Default = true,
         CallingFunction = function(self, value: boolean)
             CanSwitchItem = value
+        end
+    })
+
+    MaxAngleOption = AutoKit:Slider({
+        Name = "Max Angle",
+        Flag = "AutoKitMaxAngle",
+        Min = 1,
+        Max = 360,
+        Default = 360,
+        CallingFunction = function(self, value: number)
+            MaxAngle = value
         end
     })
 
@@ -5497,16 +5843,57 @@ end)();
         CallingFunction = function(self, enabled: boolean)
             if enabled then
                 OldGet = GameData.Utils.Remotes.Get
-                GameData.Utils.Remotes.Get = function(Name: string, ...)
+                GameData.Utils.Remotes.Get = function(self, Name: string, ...)
                     if Name == "StepOnSnapTrap" then
                         return {SendToServer = function() end}
                     end
 
-                    return OldGet(Name, ...)
+                    return OldGet(self, Name, ...)
                 end
             else
                 if OldGet then
                     GameData.Utils.Remotes.Get = OldGet
+                end
+            end
+        end
+    })
+end)();
+
+(function()
+    local Distance = 20
+    Windows.Utility:CreateModule({
+        Name = "Bed Protector",
+        Button = true,
+        Flag = "BedProtector",
+        CallingFunction = function(self, enabled: boolean)
+            if enabled then
+                local Bed = GetNearestBed(true, true)
+                if Bed.Bed and Distance >= Bed.Distance then
+                    for _, v in Enum.NormalId:GetEnumItems() do
+                        if v == Enum.NormalId.Bottom then
+                            continue
+                        end
+
+                        for i = 1, 2 do
+                            local Block = GetBlocks()
+                            local Pos: Vector3 = Bed.Bed.Position + (Vector3.fromNormalId(v) * (3 * i))
+                            GameData.Utils.BlockPlacer.new(GameData.Utils.BlockClient, Block.Type):placeBlock(GameData.Utils.BlockEngine:getBlockPosition(Pos))
+                            GameData.Utils.BlockPlacer.new(GameData.Utils.BlockClient, Block.Type):placeBlock(GameData.Utils.BlockEngine:getBlockPosition(Pos - (Bed.Bed.CFrame.LookVector * (3))))
+
+                            if i == 1 then
+                                GameData.Utils.BlockPlacer.new(GameData.Utils.BlockClient, Block.Type):placeBlock(GameData.Utils.BlockEngine:getBlockPosition(Pos + Vector3.new(0, 3, 0)))
+                                GameData.Utils.BlockPlacer.new(GameData.Utils.BlockClient, Block.Type):placeBlock(GameData.Utils.BlockEngine:getBlockPosition((Pos - (Bed.Bed.CFrame.LookVector * (3))) + Vector3.new(0, 3, 0)))
+
+                                GameData.Utils.BlockPlacer.new(GameData.Utils.BlockClient, Block.Type):placeBlock(GameData.Utils.BlockEngine:getBlockPosition(Pos + Vector3.new(0, 0, 3)))
+                                GameData.Utils.BlockPlacer.new(GameData.Utils.BlockClient, Block.Type):placeBlock(GameData.Utils.BlockEngine:getBlockPosition((Pos - (Bed.Bed.CFrame.LookVector * (3))) + Vector3.new(0, 0, 3)))
+
+                                GameData.Utils.BlockPlacer.new(GameData.Utils.BlockClient, Block.Type):placeBlock(GameData.Utils.BlockEngine:getBlockPosition(Pos - Vector3.new(0, 0, 3)))
+                                GameData.Utils.BlockPlacer.new(GameData.Utils.BlockClient, Block.Type):placeBlock(GameData.Utils.BlockEngine:getBlockPosition((Pos - (Bed.Bed.CFrame.LookVector * (3))) - Vector3.new(0, 0, 3)))
+                            end
+                        end
+                    end
+                else
+                    task.delay(0.1, Warning, "Bed protector", "No bed in range", 5)
                 end
             end
         end
