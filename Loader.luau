@@ -117,8 +117,8 @@ local function DownloadDirectory(DirectoryLink: string, SavePath: string): boole
                                         DownloadDirectory(DirectoryLink.."/"..v.name, SavePath.."/"..v.name)
                                     end
                                 else
-                                    if (isfile and not isfile("NewNight/"..SavePath.."/"..v.name)) or not isfile then
-                                        print(DownloadAsset("/raw/refs/heads/main/"..v.path, "NewNight/"..SavePath.."/"..v.name))
+                                    if (isfile and (not isfile("NewNight/"..SavePath.."/"..v.name) or (Night.Version == "3.05" and not isfile("NewNight/Assets/UpdatedIcons.txt")))) or not isfile then
+                                        DownloadAsset("/raw/refs/heads/main/"..v.path, "NewNight/"..SavePath.."/"..v.name)
                                     end
                                 end
                             end
@@ -135,6 +135,7 @@ local function DownloadDirectory(DirectoryLink: string, SavePath: string): boole
 end
 
 DownloadDirectory("/tree/main/Assets", "Assets")
+writefile("NewNight/Assets/UpdatedIcons.txt", "")
 if Night.Dev then
     loadstring(readfile("NewNight/Library/Main.luau"))()
 else
@@ -218,7 +219,3 @@ Night:CreateNotification({
     Description = Night.Load.LoadTips[math.random(1, #Night.Load.LoadTips)],
     Duration = 3
 })
-
-
-
-
