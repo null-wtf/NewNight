@@ -3292,7 +3292,7 @@ end)();
                                     local Obj = Tools[i]
                                     local ItemType = Obj.Item.itemType
 
-                                    if Windows.Movement.Modules.LongJump.Enabled or (ProjectileAura.Settings.CombineWithKillAura and #GameData.Data.KillAuraTargets > 0) then
+                                    if Windows.Movement.Modules.LongJump.Enabled or (not ProjectileAura.Settings.CombineWithKillAura and #GameData.Data.KillAuraTargets > 0) then
                                         if ProjectileAura.Data.LastSetTarget then
                                             GameData.Data.Target = nil
                                             ProjectileAura.Data.LastSetTarget = false
