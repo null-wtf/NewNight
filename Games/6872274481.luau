@@ -422,9 +422,9 @@ local function SwitchItem(Item: Instance)
             end
 
             task.wait() 
-        until false or (os.clock() - CompTime) > 0.3
+        until false or (os.clock() - CompTime) > 0.4
 
-        task.wait(0.01)
+        task.wait(0.012)
     end
 end
 
@@ -3153,6 +3153,7 @@ end)();
             TargetMode = "Distance",
             TP = false,
             WallCheck = false,
+            CombineWithKillAura = false,
             Targets = {
                 Players = false,
                 Npcs = false
@@ -3291,7 +3292,7 @@ end)();
                                     local Obj = Tools[i]
                                     local ItemType = Obj.Item.itemType
 
-                                    if Windows.Movement.Modules.LongJump.Enabled then
+                                    if Windows.Movement.Modules.LongJump.Enabled or (not ProjectileAura.Settings.CombineWithKillAura and #GameData.Data.KillAuraTargets > 0) then
                                         if ProjectileAura.Data.LastSetTarget then
                                             GameData.Data.Target = nil
                                             ProjectileAura.Data.LastSetTarget = false
@@ -3433,6 +3434,15 @@ end)();
             ProjectileAura.Settings.TargetMode = value
         end
     })    
+
+    ProjAura:MiniToggle({
+        Name = "Allow KillAura",
+        Flag = "ProjectileAuraAllowKillAura",
+        Default = true,
+        CallingFunction = function(self, value: boolean)
+            ProjectileAura.Settings.CombineWithKillAura = value
+        end
+    })
 
     ProjAura:MiniToggle({
         Name = "Wall Check",
