@@ -220,7 +220,7 @@ do
         return RealData
     end
 
-    function Assets.Functions:GetNerestPlayerToMouse(Data: {TeamCheck: boolean, Distance: number?, Exclude: {}?, Extras: {}?}): { DistanceFromMouse: number, DistanceFromPlayer: number, Player: Player?, Character: Model?}
+    function Assets.Functions:GetNerestPlayerToMouse(Data: {TeamCheck: boolean, Distance: number?, Exclude: {}?, Extras: {}?, Targets: {Players: boolean, Npcs: boolean}?}): { DistanceFromMouse: number, DistanceFromPlayer: number, Player: Player?, Character: Model?}
         local RealData = {
             Character = nil,
             Player = nil,
@@ -230,6 +230,13 @@ do
 
         if not Data.Exclude then 
             Data.Exclude = {}
+        end
+
+        if not Data.Targets then
+            Data.Targets = {
+                Players = true,
+                Npcs = true
+            }
         end
 
         if not Data.Distance then
@@ -252,26 +259,28 @@ do
             for i,v : Model? in AllEntities do
                 if Assets.Functions:IsAlive(v, true) and not table.find(Data.Exclude, v) then
                     local Player: Player = Players:GetPlayerFromCharacter(v)
-                    if Player and table.find(Data.Exclude, Player) then
-                        continue
-                    end
+                    if ((Data.Targets.Players and Player) or (Data.Targets.Npcs and not Player)) then
+                        if Player and table.find(Data.Exclude, Player) then
+                            continue
+                        end
 
-                    if Data.TeamCheck and (not Player or not Player.Team or Player.Team == LocalPlayer.Team) then
-                        continue
-                    end
+                        if Data.TeamCheck and (not Player or not Player.Team or Player.Team == LocalPlayer.Team) then
+                            continue
+                        end
 
-                    local Root: BasePart = v.PrimaryPart
-                    local MousePos: Vector3 = Mouse.Hit.Position
-                    local MouseDistance: number = Assets.Functions:GetDistanceFrom(MousePos, Root.Position)
-                    local PlayerDistance: number = Assets.Functions:GetDistanceFrom(LocalPlayer.Character.PrimaryPart.Position, Root.Position)
+                        local Root: BasePart = v.PrimaryPart
+                        local MousePos: Vector3 = Mouse.Hit.Position
+                        local MouseDistance: number = Assets.Functions:GetDistanceFrom(MousePos, Root.Position)
+                        local PlayerDistance: number = Assets.Functions:GetDistanceFrom(LocalPlayer.Character.PrimaryPart.Position, Root.Position)
 
-                    if RealData.DistanceFromMouse >= MouseDistance and Data.Distance >= MouseDistance then
-                        RealData = {
-                            Character = v,
-                            Player = Player,
-                            DistanceFromMouse = MouseDistance,
-                            DistanceFromPlayer = PlayerDistance
-                        }
+                        if RealData.DistanceFromMouse >= MouseDistance and Data.Distance >= MouseDistance then
+                            RealData = {
+                                Character = v,
+                                Player = Player,
+                                DistanceFromMouse = MouseDistance,
+                                DistanceFromPlayer = PlayerDistance
+                            }
+                        end
                     end
                 end
             end
@@ -1981,13 +1990,13 @@ local function CreateWindow(Data: {Name: string, Flag: string, Size: UDim2, Posi
                 local SliderBackground: Frame = Instance.new("Frame", SliderBase)
                 SliderBackground.BackgroundColor3 = Color3.fromRGB(14, 16, 23)
                 SliderBackground.Position = UDim2.fromScale(0.07, 0.6)
-                SliderBackground.Size = UDim2.fromOffset(190, 16)
+                SliderBackground.Size = UDim2.fromOffset(190, 4)
                 SliderBackground.ZIndex = 95
                 Instance.new("UICorner", SliderBackground).CornerRadius = UDim.new(1, 0)
 
                 local SliderFilled: Frame = Instance.new("Frame", SliderBackground)
                 SliderFilled.BackgroundColor3 = UIData.Theme.Other
-                SliderFilled.Size = UDim2.fromOffset(77, 16)
+                SliderFilled.Size = UDim2.fromOffset(77, 4)
                 SliderFilled.ZIndex = 95
                 Instance.new("UICorner", SliderFilled).CornerRadius = UDim.new(1, 0)
                 table.insert(UIData.CustomizableItems.Other, {
@@ -1997,8 +2006,8 @@ local function CreateWindow(Data: {Name: string, Flag: string, Size: UDim2, Posi
 
                 local SliderCircle: ImageButton = Instance.new("ImageButton", SliderFilled)
                 SliderCircle.BackgroundColor3 = UIData.Theme.Other
-                SliderCircle.Position = UDim2.fromScale(0.95, 0.188)
-                SliderCircle.Size = UDim2.fromOffset(10, 10)
+                SliderCircle.Position = UDim2.fromScale(0.95, -0.5)
+                SliderCircle.Size = UDim2.fromOffset(8, 8)
                 SliderCircle.ImageTransparency = 1
                 SliderCircle.ZIndex = 95
                 SliderCircle.AutoButtonColor = false
@@ -2010,7 +2019,7 @@ local function CreateWindow(Data: {Name: string, Flag: string, Size: UDim2, Posi
 
                 local CircleBorder: UIStroke = Instance.new("UIStroke", SliderCircle)
                 CircleBorder.Color = Color3.fromRGB(14, 16, 23)
-                CircleBorder.Thickness = 3
+                CircleBorder.Thickness = 2
 
                 function SliderData.Functions:SetValue(Value: number, SaveConfig: boolean, Load: boolean?)
                     SliderData.Value = Value
@@ -2231,10 +2240,17 @@ local function CreateWindow(Data: {Name: string, Flag: string, Size: UDim2, Posi
                     File = "BuilderMono-Bold",
                 }}), Enum.FontWeight.Bold)
 
-                local RealColorSlider: ImageButton = Instance.new("ImageButton", MainBackground)
+                local ColorSliderBackground: Frame = Instance.new("Frame", MainBackground)
+                ColorSliderBackground.BackgroundColor3 = Color3.fromRGB(14, 16, 23)
+                ColorSliderBackground.Position = UDim2.new(0.54, 0, 0.5, 8)
+                ColorSliderBackground.Size = UDim2.fromOffset(84, 4)
+                ColorSliderBackground.ZIndex = 95
+                Instance.new("UICorner", ColorSliderBackground).CornerRadius = UDim.new(1, 0)
+
+                local RealColorSlider: ImageButton = Instance.new("ImageButton", ColorSliderBackground)
                 RealColorSlider.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-                RealColorSlider.Position = UDim2.fromScale(0.54, 0.5)
-                RealColorSlider.Size = UDim2.fromOffset(84, 16)
+                RealColorSlider.Position = UDim2.fromScale(0, 0)
+                RealColorSlider.Size = UDim2.fromOffset(84, 4)
                 RealColorSlider.ZIndex = 95
                 RealColorSlider.ImageTransparency = 1
                 RealColorSlider.AutoButtonColor = false
@@ -2242,14 +2258,14 @@ local function CreateWindow(Data: {Name: string, Flag: string, Size: UDim2, Posi
 
                 local Circle: Frame = Instance.new("Frame", RealColorSlider)
                 Circle.BackgroundTransparency = 1
-                Circle.Position = UDim2.fromScale(0.498, 0.094)
-                Circle.Size = UDim2.fromOffset(12, 12)
+                Circle.Position = UDim2.fromScale(0.498, -0.5)
+                Circle.Size = UDim2.fromOffset(8, 8)
                 Circle.ZIndex = 95
                 Instance.new("UICorner", Circle).CornerRadius = UDim.new(1, 0)
 
                 local CircleStroke: UIStroke = Instance.new("UIStroke", Circle)
-                CircleStroke.Color = Color3.fromRGB(255, 255, 255)
-                CircleStroke.Thickness = 3
+                CircleStroke.Color = Color3.fromRGB(190, 190, 190)
+                CircleStroke.Thickness = 2
 
                 local SliderGradient: UIGradient = Instance.new("UIGradient", RealColorSlider)
                 SliderGradient.Color = ColorSequence.new(({
@@ -2302,10 +2318,8 @@ local function CreateWindow(Data: {Name: string, Flag: string, Size: UDim2, Posi
                             local Hue: number = CRPos / ABS
                             local HSVValue: Color3 = Color3.fromHSV(Hue, 1, 1)
 
-                            if 70 >= CRPos then
-                                RealColorSliderData.Functions:SetValue(Assets.Functions:ConvertColor3toInt(HSVValue))
-                                Circle.Position = UDim2.fromScale(Hue, 0.094)
-                            end
+                            RealColorSliderData.Functions:SetValue(Assets.Functions:ConvertColor3toInt(HSVValue))
+                            Circle.Position = UDim2.fromScale(Hue, -0.5)
                         end
                     end
 
@@ -2374,7 +2388,7 @@ local function CreateWindow(Data: {Name: string, Flag: string, Size: UDim2, Posi
                 end
 
                 if RealDropdownData.Data.MinLimit == nil then
-                    RealDropdownData.Data.MinLimit = true
+                    RealDropdownData.Data.MinLimit = 1
                 end
 
                 local MainBg: Frame = Instance.new("Frame", SettingsHolder)
@@ -2513,7 +2527,7 @@ local function CreateWindow(Data: {Name: string, Flag: string, Size: UDim2, Posi
                             end
 
                             if RealDropdownData.SelectedAmount < RealDropdownData.Data.MaxLimit or not selected then
-                                if not selected and RealDropdownData.Data.MinLimit and (RealDropdownData.SelectedAmount - 1) ~= 0 or removemincheck or selected or not RealDropdownData.Data.MinLimit then
+                                if not selected and RealDropdownData.Data.MinLimit and (RealDropdownData.SelectedAmount - 1) ~= (RealDropdownData.Data.MinLimit - 1) or removemincheck or selected or 0 >= RealDropdownData.Data.MinLimit then
                                     SelectedBox.Visible = selected
                                     DropOption.Selected = selected
 
@@ -2539,7 +2553,12 @@ local function CreateWindow(Data: {Name: string, Flag: string, Size: UDim2, Posi
                                     if RealDropdownData.Data.MaxLimit == 1 then
                                         RealDropdownData.Data.CallingFunction(RealDropdownData, RealSelected[1])
                                     else
-                                        RealDropdownData.Data.CallingFunction(RealDropdownData, RealSelected)
+                                        local NewFormat = {}
+                                        for i,v in RealDropdownData.Selected do
+                                            NewFormat[v.Name] = selected
+                                        end
+
+                                        RealDropdownData.Data.CallingFunction(RealDropdownData, NewFormat)
                                     end
 
                                     if saveconfig then
@@ -3385,20 +3404,20 @@ end
 
 -- hi, we just want to see how popular night is + see if people try to use in other games so we can add more support and get feedback
 -- please dont spam
-task.spawn(function()
-    pcall(function()
-        if RequestFunc then
-            RequestFunc({
-                Url = "https://nehfeauefutth2.onrender.com/execution",
-                Method = "GET",
-                Headers = {
-                    username = tostring(LocalPlayer.Name),
-                    placeid = tostring(game.PlaceId)
-                }
-            })
-        end
-    end)
-end)
+-- task.spawn(function()
+--     pcall(function()
+--         if RequestFunc then
+--             RequestFunc({
+--                 Url = "https://nehfeauefutth2.onrender.com/execution",
+--                 Method = "GET",
+--                 Headers = {
+--                     username = tostring(LocalPlayer.Name),
+--                     placeid = tostring(game.PlaceId)
+--                 }
+--             })
+--         end
+--     end)
+-- end)
 
 function Assets.Functions:GetTargetHud(Create: boolean, Data: {Player: Player?, UserData: {Name: string, DisplayName: string, ProfilePic: string?}?, Health: {Current: number, Max: number}?}?)
     local THUD = UIData.TargetHud
