@@ -1657,6 +1657,17 @@ end)();
     })
 
     KillAura:Slider({
+        Name = "Swing Range",
+        Flag = "KillAuraSwingRange",
+        Min = 1,
+        Max = 32,
+        Default = 32,
+        CallingFunction = function(self, value: number)
+            KillAuraData.Settings.SwingRange = value
+        end
+    })
+
+    KillAura:Slider({
         Name = "Max Angle",
         Flag = "KillAuraMaxAngle",
         Min = 1,
