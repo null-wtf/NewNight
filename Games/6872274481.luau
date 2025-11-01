@@ -3218,28 +3218,36 @@ end)();
         local Mag = Vec.Magnitude
         local Time = Mag / LaunchVel
 
-        for _ = 1, 5 do
-            local Velocity = Vector3.new(TargetVel.X, TargetVel.Y * 0.5, TargetVel.Z)
-            local Prediction = TargetPos + Velocity * Time
+        local LastTime = 0
+        local Iter = 0
 
+        while math.abs(Time - LastTime) > 0.001 and Iter < 8 do
+            Iter += 1
+            LastTime = Time
+
+            local DampFactor = math.clamp(0.4 + (100 / LaunchVel) * 0.1, 0.35, 0.55)
+            local Velocity = Vector3.new(TargetVel.X, TargetVel.Y * DampFactor, TargetVel.Z)
+
+            local Prediction = TargetPos + Velocity * Time
             local Dist2 = Prediction - Start
             local Horiz = Vector3.new(Dist2.X, 0, Dist2.Z)
-            local HorizDist = Horiz.Magnitude
+            local HorizMag = Horiz.Magnitude
 
-            local TimeNew = HorizDist / LaunchVel
+            local TimeNew = HorizMag / LaunchVel
             TimeNew = TimeNew + math.abs((Dist2.Y + 0.5 * Gravity * Time^2) / LaunchVel)
+
             Time = (Time + TimeNew) * 0.5
         end
 
         Time += ((Stats and Stats.Ping:GetValue() / 1000) or 0.1)
 
-        local Velocity = Vector3.new(TargetVel.X, TargetVel.Y * 0.45, TargetVel.Z)
-        local FinalPrediction = TargetPos + Velocity * Time
+        local Factor = math.clamp(0.42 + (100 / LaunchVel) * 0.1, 0.38, 0.5)
+        local FinalPrediction = TargetPos + Vector3.new(TargetVel.X, TargetVel.Y * Factor, TargetVel.Z) * Time
 
-        local Drop = math.clamp(0.22 + (80 / LaunchVel) * 0.06, 0.25, 0.38)
-        FinalPrediction -= Vector3.new(0, Drop * Gravity * Time * Time, 0)
-
+        local DropFactor = math.clamp(0.22 + (80 / LaunchVel) * 0.06 + (Mag / 2000), 0.25, 0.38)
+        FinalPrediction -= Vector3.new(0, DropFactor * Gravity * Time * Time, 0)
         FinalPrediction += Vector3.new(0, 1.8, 0)
+
         return FinalPrediction
     end
 
