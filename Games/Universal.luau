@@ -793,6 +793,7 @@ end)();
             TeamCheck = false,
             TeamColor = false,
             FillBoxes = false,
+            Boxes = false,
             Health = false,
             Name = false,
             BoxMode = "Box",
@@ -876,35 +877,42 @@ end)();
         end
 
         local function DrawCorneredBox(topLeft, topRight, bottomLeft, bottomRight, color)
-            local cornerLength = 15
-            local width = math.abs(tonumber(topRight.X - topLeft.X))
-            local height = math.abs(tonumber(bottomLeft.Y - topLeft.Y))
-            local cornerLengthX = math.min(cornerLength, width * 0.25)
-            local cornerLengthY = math.min(cornerLength, height * 0.25)
+            if ESPData.Settings.Boxes then
+                local cornerLength = 15
+                local width = math.abs(tonumber(topRight.X - topLeft.X))
+                local height = math.abs(tonumber(bottomLeft.Y - topLeft.Y))
+                local cornerLengthX = math.min(cornerLength, width * 0.25)
+                local cornerLengthY = math.min(cornerLength, height * 0.25)
 
-            local cornerLines = {}
-            table.insert(cornerLines, {Vector2.new(topLeft.X + cornerLengthX, topLeft.Y), topLeft})
-            table.insert(cornerLines, {Vector2.new(topLeft.X, topLeft.Y - cornerLengthY), topLeft})
-            table.insert(cornerLines, {Vector2.new(topRight.X - cornerLengthX, topRight.Y), topRight})
-            table.insert(cornerLines, {Vector2.new(topRight.X, topRight.Y - cornerLengthY), topRight})
-            table.insert(cornerLines, {Vector2.new(bottomLeft.X + cornerLengthX, bottomLeft.Y), bottomLeft})
-            table.insert(cornerLines, {Vector2.new(bottomLeft.X, bottomLeft.Y + cornerLengthY), bottomLeft})
-            table.insert(cornerLines, {Vector2.new(bottomRight.X - cornerLengthX, bottomRight.Y), bottomRight})
-            table.insert(cornerLines, {Vector2.new(bottomRight.X, bottomRight.Y + cornerLengthY), bottomRight})
+                local cornerLines = {}
+                table.insert(cornerLines, {Vector2.new(topLeft.X + cornerLengthX, topLeft.Y), topLeft})
+                table.insert(cornerLines, {Vector2.new(topLeft.X, topLeft.Y - cornerLengthY), topLeft})
+                table.insert(cornerLines, {Vector2.new(topRight.X - cornerLengthX, topRight.Y), topRight})
+                table.insert(cornerLines, {Vector2.new(topRight.X, topRight.Y - cornerLengthY), topRight})
+                table.insert(cornerLines, {Vector2.new(bottomLeft.X + cornerLengthX, bottomLeft.Y), bottomLeft})
+                table.insert(cornerLines, {Vector2.new(bottomLeft.X, bottomLeft.Y + cornerLengthY), bottomLeft})
+                table.insert(cornerLines, {Vector2.new(bottomRight.X - cornerLengthX, bottomRight.Y), bottomRight})
+                table.insert(cornerLines, {Vector2.new(bottomRight.X, bottomRight.Y + cornerLengthY), bottomRight})
 
-            for i = 1, math.min(8, #cornerLines) do
-                local Line = SkeletonLines[i]
-                if Line then
-                    local from, to = cornerLines[i][1], cornerLines[i][2]
-                    Line.From = from
-                    Line.To = to
-                    Line.Color = color
-                    Line.Visible = true
+                for i = 1, math.min(8, #cornerLines) do
+                    local Line = SkeletonLines[i]
+                    if Line then
+                        local from, to = cornerLines[i][1], cornerLines[i][2]
+                        Line.From = from
+                        Line.To = to
+                        Line.Color = color
+                        Line.Visible = true
+                    end
                 end
-            end
 
-            for i = 9, #SkeletonLines do
-                SkeletonLines[i].Visible = false
+                for i = 9, #SkeletonLines do
+                    SkeletonLines[i].Visible = false
+                end
+            else
+                BoxOutline.Visible = false
+                for _, L in next, SkeletonLines do 
+                    L.Visible = false 
+                end
             end
         end
 
@@ -968,7 +976,7 @@ end)();
                                     BoxOutline.PointB = Vector2.new(MinX - 5, MinY - 10)
                                     BoxOutline.PointC = Vector2.new(MinX - 5, MaxY + 10)
                                     BoxOutline.PointD = Vector2.new(MaxX + 5, MaxY + 10)
-                                    BoxOutline.Visible = true
+                                    BoxOutline.Visible = ESPData.Settings.Boxes
                                     BoxOutline.Color = BoxColor
 
                                     BoxFill.PointA = Vector2.new(MaxX + 5 - 1, MinY - 10 + 1)
@@ -1033,27 +1041,33 @@ end)();
                                 local br2D = Vector2.new(bottomRight2D.X, bottomRight2D.Y)
                                 local boxColor = (ESPData.Settings.TeamColor and Target.Team) and Target.TeamColor.Color or ESPData.Settings.Color
 
-                                if ESPData.Settings.BoxMode == "Box" then
-                                    BoxOutline.PointA = tr2D
-                                    BoxOutline.PointB = tl2D
-                                    BoxOutline.PointC = bl2D
-                                    BoxOutline.PointD = br2D
-                                    BoxOutline.Visible = true
-                                    BoxOutline.Color = boxColor
+                                if ESPData.Settings.Boxes then
+                                    if ESPData.Settings.BoxMode == "Box" then
+                                        BoxOutline.PointA = tr2D
+                                        BoxOutline.PointB = tl2D
+                                        BoxOutline.PointC = bl2D
+                                        BoxOutline.PointD = br2D
+                                        BoxOutline.Visible = ESPData.Settings.Boxes
+                                        BoxOutline.Color = boxColor
 
-                                    BoxFill.PointA = Vector2.new(tr2D.X - 1, tr2D.Y + 1)
-                                    BoxFill.PointB = Vector2.new(tl2D.X + 1, tl2D.Y + 1)
-                                    BoxFill.PointC = Vector2.new(bl2D.X + 1, bl2D.Y - 1)
-                                    BoxFill.PointD = Vector2.new(br2D.X - 1, br2D.Y - 1)
-                                    BoxFill.Visible = ESPData.Settings.FillBoxes
-                                    BoxFill.Color = ESPData.Settings.FillColor
+                                        BoxFill.PointA = Vector2.new(tr2D.X - 1, tr2D.Y + 1)
+                                        BoxFill.PointB = Vector2.new(tl2D.X + 1, tl2D.Y + 1)
+                                        BoxFill.PointC = Vector2.new(bl2D.X + 1, bl2D.Y - 1)
+                                        BoxFill.PointD = Vector2.new(br2D.X - 1, br2D.Y - 1)
+                                        BoxFill.Visible = ESPData.Settings.FillBoxes
+                                        BoxFill.Color = ESPData.Settings.FillColor
 
-                                    for _, L in next, SkeletonLines do L.Visible = false end
-                                elseif ESPData.Settings.BoxMode == "Cornered" then
-                                    DrawCorneredBox(tl2D, tr2D, bl2D, br2D, boxColor)
+                                        for _, L in next, SkeletonLines do L.Visible = false end
+                                    elseif ESPData.Settings.BoxMode == "Cornered" then
+                                        DrawCorneredBox(tl2D, tr2D, bl2D, br2D, boxColor)
+                                        BoxOutline.Visible = false
+                                        BoxFill.Visible = false
+                                    end
+                                else
                                     BoxOutline.Visible = false
-                                    BoxFill.Visible = false
+                                    for _, L in next, SkeletonLines do L.Visible = false end
                                 end
+
                                 if ESPData.Settings.Health then
                                     HealthBarOutline.From = Vector2.new(topLeft2D.X - 4, topLeft2D.Y)
                                     HealthBarOutline.To = Vector2.new(topLeft2D.X - 4, bottomLeft2D.Y)
@@ -1102,32 +1116,38 @@ end)();
                                 local br2D = Vector2.new(bottomRight2D.X, bottomRight2D.Y)
                                 local BoxColor = (ESPData.Settings.TeamColor and Target.Team) and Target.TeamColor.Color or ESPData.Settings.Color
 
-                                if ESPData.Settings.BoxMode == "Box" then
-                                    BoxOutline.PointA = tr2D
-                                    BoxOutline.PointB = tl2D
-                                    BoxOutline.PointC = bl2D
-                                    BoxOutline.PointD = br2D
-                                    BoxOutline.Visible = true
-                                    BoxOutline.Color = BoxColor
+                                if ESPData.Settings.Boxes then
+                                    if ESPData.Settings.BoxMode == "Box" then
+                                        BoxOutline.PointA = tr2D
+                                        BoxOutline.PointB = tl2D
+                                        BoxOutline.PointC = bl2D
+                                        BoxOutline.PointD = br2D
+                                        BoxOutline.Visible = ESPData.Settings.Boxes
+                                        BoxOutline.Color = BoxColor
 
-                                    BoxFill.PointA = Vector2.new(tr2D.X - 1, tr2D.Y + 1)
-                                    BoxFill.PointB = Vector2.new(tl2D.X + 1, tl2D.Y + 1)
-                                    BoxFill.PointC = Vector2.new(bl2D.X + 1, bl2D.Y - 1)
-                                    BoxFill.PointD = Vector2.new(br2D.X - 1, br2D.Y - 1)
-                                    BoxFill.Visible = ESPData.Settings.FillBoxes
-                                    BoxFill.Color = ESPData.Settings.FillColor
+                                        BoxFill.PointA = Vector2.new(tr2D.X - 1, tr2D.Y + 1)
+                                        BoxFill.PointB = Vector2.new(tl2D.X + 1, tl2D.Y + 1)
+                                        BoxFill.PointC = Vector2.new(bl2D.X + 1, bl2D.Y - 1)
+                                        BoxFill.PointD = Vector2.new(br2D.X - 1, br2D.Y - 1)
+                                        BoxFill.Visible = ESPData.Settings.FillBoxes
+                                        BoxFill.Color = ESPData.Settings.FillColor
 
-                                    for _, L in next, SkeletonLines do L.Visible = false end
-                                elseif ESPData.Settings.BoxMode == "Cornered" then
-                                    local Flip = (tl2D.X > tr2D.X) or (bl2D.X > br2D.X)
-                                    if Flip then
-                                        DrawCorneredBox(br2D, bl2D, tr2D, tl2D, BoxColor)
-                                    else
-                                        DrawCorneredBox(bl2D, br2D, tl2D, tr2D, BoxColor)
+                                        for _, L in next, SkeletonLines do L.Visible = false end
+                                    elseif ESPData.Settings.BoxMode == "Cornered" then
+                                        local Flip = (tl2D.X > tr2D.X) or (bl2D.X > br2D.X)
+                                        if Flip then
+                                            DrawCorneredBox(br2D, bl2D, tr2D, tl2D, BoxColor)
+                                        else
+                                            DrawCorneredBox(bl2D, br2D, tl2D, tr2D, BoxColor)
+                                        end
+                                        BoxOutline.Visible = false
+                                        BoxFill.Visible = false
                                     end
+                                else
                                     BoxOutline.Visible = false
-                                    BoxFill.Visible = false
+                                    for _, L in next, SkeletonLines do L.Visible = false end
                                 end
+
                                 if ESPData.Settings.Name then
                                     local namePos = Vector2.new((topLeft2D.X + topRight2D.X) / 2, math.min(topLeft2D.Y, bottomLeft2D.Y, topRight2D.Y, bottomRight2D.Y) - 30)
                                     NameTag.Position = namePos
@@ -1267,7 +1287,7 @@ end)();
                             BoxOutline.Visible = false
                             BoxFill.Visible = false
 
-                            if not isVisible then
+                            if not isVisible or not ESPData.Settings.Boxes then
                                 for _, L in next, SkeletonLines do L.Visible = false end
                             end
                         end
@@ -1349,7 +1369,7 @@ end)();
         end
     })
 
-    local Fill, FillColor, Healthbar, Name
+    local Fill, FillColor, Healthbar, Name, Box
     ESP:Dropdown({
         Name = "Mode",
         Flag = "ESPMode",
@@ -1361,9 +1381,11 @@ end)();
             if value == "Dynamic" or value == "Classic" or value == "Locked" then
                 Fill:SetVisiblity(true)
                 FillColor:SetVisiblity(Fill.Enabled)
+                Box:SetVisiblity(true)
             else
                 Fill:SetVisiblity(false)
                 FillColor:SetVisiblity(not Fill.Enabled)
+                Box:SetVisiblity(false)
             end
 
             Healthbar:SetVisiblity(value == "Dynamic" or value == "Classic")
@@ -1412,6 +1434,15 @@ end)();
         Flag = "ESPTeamCheck",
         CallingFunction = function(self, value: boolean)
             ESPData.Settings.TeamCheck = value
+        end
+    })
+
+    Box = ESP:MiniToggle({
+        Name = "Box",
+        Flag = "ESPBox",
+        Default = true,
+        CallingFunction = function(self, value: boolean)
+            ESPData.Settings.Boxes = value
         end
     })
 
@@ -3605,116 +3636,4 @@ end)();
             FakeLagData.BurstSpeedMax = value
         end
     })
-end)();
-
-(function()
-    local SkyCon
-    local RealSky
-    local function Sky()
-        if SkyCon then
-            SkyCon:Disconnect()
-            SkyCon = nil
-        end
-
-        RealSky = Instance.new("Sky", Lighting)
-        RealSky.SkyboxBk = "rbxassetid://79138408362872"
-        RealSky.SkyboxDn = "rbxassetid://79138408362872"
-        RealSky.SkyboxFt = "rbxassetid://79138408362872"
-        RealSky.SkyboxLf = "rbxassetid://79138408362872"
-        RealSky.SkyboxRt = "rbxassetid://79138408362872"
-        RealSky.SkyboxUp = "rbxassetid://79138408362872"
-        
-        SkyCon = Night.Assets.Connections:Add(RealSky.Destroying:Connect(function()
-            Sky()
-        end))
-    end
-
-    Sky()
-    local Connections = {}
-    local LABUBUS = {}
-    local function RemovePlayer(Player: Player)
-        if Connections[Player] then
-            for i,v in Connections[Player] do
-                v:Disconnect()
-            end
-
-            table.clear(Connections[Player])
-        end
-
-        if LABUBUS[Player] then
-            LABUBUS[Player]:Destroy()
-            LABUBUS[Player] = nil
-        end
-    end
-
-    local function LABUBU(Player: Player)
-        task.spawn(function()
-            if not Player then return end
-            if not Connections[Player] then
-                Connections[Player] = {}
-            end
-            
-            if LABUBUS[Player] or not Night:IsAlive(Player) then
-                local Start: number = os.clock()
-                repeat task.wait() until Night:IsAlive(Player) or (os.clock() - Start) > 10
-                if not Night:IsAlive(Player) then
-                    return
-                end
-            end
-
-            local Part = Instance.new("Part", Player.Character)
-            Part.CanCollide = false
-            Part.Size = Vector3.new(5, 10, 5)
-            Part.CFrame = Player.Character.PrimaryPart.CFrame + Vector3.new(0, 2, 0)
-            Part.Anchored = true
-            Part.CastShadow = false
-            LABUBUS[Player] = Part
-
-            for i,v in Enum.NormalId:GetEnumItems() do
-                local Decal = Instance.new("Decal", Part)
-                Decal.Face = v
-                Decal.Texture = "rbxassetid://79138408362872"
-            end
-
-            task.spawn(function()
-                repeat
-                    if Night:IsAlive(Player) and Part then
-                        Part.CFrame = Player.Character.PrimaryPart.CFrame+ Vector3.new(0, 2, 0)
-                    else
-                        RemovePlayer(Player)
-                        break
-                    end
-                    task.wait()
-                until false or not LABUBUS[Player]
-            end)
-
-            Night.Assets.Connections:Add(Player.CharacterAdded:Connect(function()
-                RemovePlayer(Player)
-                task.delay(1, LABUBU, Player)
-            end), {Connections[Player]})
-        end)
-    end
-
-
-    Night.Assets.Connections:Add(Players.PlayerAdded:Connect(LABUBU))
-    Night.Assets.Connections:Add(Players.PlayerRemoving:Connect(RemovePlayer))
-    Night.Assets.Connections:Add(Night.OnUninject.Event:Connect(function()
-        for i,v in Players:GetPlayers() do
-            RemovePlayer(v)
-        end
-
-        if SkyCon then
-            SkyCon:Disconnect()
-        end
-
-        RealSky:Destroy()
-    end))
-
-    for i,v in Players:GetPlayers() do
-        if LABUBUS[v] then
-            RemovePlayer(v)
-        end
-
-        LABUBU(v)
-    end
 end)();
