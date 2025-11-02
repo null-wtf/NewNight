@@ -422,9 +422,9 @@ local function SwitchItem(Item: Instance)
             end
 
             task.wait() 
-        until false or (os.clock() - CompTime) > 0.4
+        until false or (os.clock() - CompTime) > ((Stats and (Stats.Ping:GetValue() / 1000) + 0.05) or 0.2)
 
-        task.wait(0.012)
+        task.wait(0.001)
     end
 end
 
@@ -515,6 +515,7 @@ local function GetEntity(Data: {TeamCheck: boolean?, Mode: string?, MaxRange: nu
                         RaycastParams.IgnoreWater = true
                         RaycastParams.FilterType = Enum.RaycastFilterType.Exclude
                         RaycastParams.FilterDescendantsInstances = CollectionService:GetTagged("entity")
+                        Data.Visible.Params = RaycastParams
                     end
                     
                     if not IsPathClear(v.Entity, v.Root, Data.Visible.Params) then
@@ -1468,7 +1469,7 @@ end)();
                                     table.insert(GameData.Data.KillAuraTargets, NearestEntity)
                                 end
 
-                                if #GameData.Data.KillAuraTargets >= KillAuraData.Settings.MaxTargets then
+                                if #GameData.Data.KillAuraTargets > KillAuraData.Settings.MaxTargets then
                                     table.remove(GameData.Data.KillAuraTargets, 1)
                                 end
                             end
@@ -1516,7 +1517,7 @@ end)();
                             end
 
                             if KillAuraData.Settings.Range >= NearestEntity.Distance then
-                                local HitPos: Vector3 = (math.clamp(NearestEntity.Distance - 14.4, 10, 30) * (NearestEntity.Entity.PrimaryPart.Position - LocalPlayer.Character.PrimaryPart.Position).Unit) + LocalPlayer.Character.PrimaryPart.Position
+                                local HitPos: Vector3 = (math.clamp(NearestEntity.Distance - 14, 10, 30) * (NearestEntity.Entity.PrimaryPart.Position - LocalPlayer.Character.PrimaryPart.Position).Unit) + LocalPlayer.Character.PrimaryPart.Position
                                 GameData.Utils.Remotes:Get("SwordHit"):SendToServer({
                                     entityInstance = NearestEntity.Entity,
                                     chargedAttack = {chargeRatio = 0},
@@ -2763,6 +2764,7 @@ end)();
                         if not Chest.Chest:GetAttribute("ChestOpened") then
                             coroutine.wrap(function()
                                 GameData.Utils.Chest:playChestOpenAnimation(Chest.Chest)
+                                Chest.Chest:SetAttribute("ChestOpened", true)
                             end)()
                         end
 
