@@ -1402,8 +1402,8 @@ end)();
                         }
 
                         for i,v in GameData.Data.KillAuraTargets do
-                            local NewAngle: number = GetAngle(LocalPlayer.Character.PrimaryPart.CFrame, v.Entity.PrimaryPart.Position)
                             if v.Entity and Night:IsAlive(v.Entity, true) then
+                                local NewAngle: number = GetAngle(LocalPlayer.Character.PrimaryPart.CFrame, v.Entity.PrimaryPart.Position)
                                 if NewAngle < (KillAuraData.Settings.MaxAngle / 2 * math.pi / 180) then
                                     local Distance: number = Night:GetDistanceFrom(LocalPlayer.Character.PrimaryPart.Position, v.Entity.PrimaryPart.Position)
                                     if (Distance > KillAuraData.Settings.Range and Distance > KillAuraData.Settings.SwingRange) then
@@ -3259,8 +3259,7 @@ end)();
         local FinalPrediction = TargetPos + Vector3.new(TargetVel.X, TargetVel.Y * Factor, TargetVel.Z) * Time
 
         local DropFactor = math.clamp(0.22 + (80 / LaunchVel) * 0.06 + (Mag / 2000), 0.25, 0.38)
-        FinalPrediction -= Vector3.new(0, DropFactor * Gravity * Time * Time, 0)
-        FinalPrediction += Vector3.new(0, 1.8, 0)
+        FinalPrediction -= Vector3.new(0, (DropFactor * Gravity * Time * Time) - 2.2, 0)
 
         return FinalPrediction
     end
@@ -3289,7 +3288,7 @@ end)();
                                 GameData.Data.Target = Target
                                 ProjectileAura.Data.LastSetTarget = true
 
-                            
+                                
                                 for i = 1, #Tools do
                                     local Obj = Tools[i]
                                     local ItemType = Obj.Item.itemType
@@ -3334,8 +3333,10 @@ end)();
                                                 end)
                                             end)()
                                             
-                                            ProjectileAura.Data.DelayProj[ItemType] = os.clock() + Obj.Meta.fireDelaySec
-                                            task.wait(ProjectileAura.Settings.Delay)
+                                            ProjectileAura.Data.DelayProj[ItemType] = os.clock() + (Obj.Meta.fireDelaySec - 0.15)
+                                            if ProjectileAura.Settings.Delay > 0 then
+                                                task.wait(ProjectileAura.Settings.Delay)
+                                            end
                                         end
                                     end
                                 end
@@ -3395,9 +3396,9 @@ end)();
     ProjAura:Slider({
         Name = "Delay",
         Flag = "ProjectileAuraDelay",
-        Min = 0.3,
+        Min = 0,
         Max = 5,
-        Default = 0.1,
+        Default = 0,
         Increment = 0.1,
         CallingFunction = function(self, value: number)
             ProjectileAura.Settings.Delay = value
@@ -4538,7 +4539,7 @@ end)();
                 end
 
                 for _, v in getconnections(RunService.Heartbeat) do
-                    if v.Function and typeof(v.Function) == "function" then
+                    if v.Function and typeof(v.Function) == "function" and (islclosure and islclosure(v.Function) or iscclosure and not iscclosure(v.Function)) then
                         local Constants = debug.getconstants(v.Function)
                         if #Constants > 0 and table.find(Constants, "AfkInfo") then
                             v:Disable()
