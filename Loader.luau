@@ -20,7 +20,7 @@ local Camera: Camera = workspace.CurrentCamera
 local BaseGit: string = "https://github.com/null-wtf/NewNight"
 local NightInit: {[any]: any} = getgenv().NightInit or {}
 local Night = {
-    Version = "3.05",
+    Version = "3.06",
     BaseGit = BaseGit,
     Scale = 0.9,
     Keybind = Enum.KeyCode.RightShift,
@@ -29,6 +29,7 @@ local Night = {
     Init = NightInit,
     Connections = {},
     CurrentConfig = {},
+    IgnoreConfigs = {"8560631822", "8444591321"},
     OnUninject = Instance.new("BindableEvent"),
     Load = {
         Start = os.clock(),
@@ -117,7 +118,7 @@ local function DownloadDirectory(DirectoryLink: string, SavePath: string): boole
                                         DownloadDirectory(DirectoryLink.."/"..v.name, SavePath.."/"..v.name)
                                     end
                                 else
-                                    if (isfile and (not isfile("NewNight/"..SavePath.."/"..v.name) or (Night.Version == "3.05" and not isfile("NewNight/Assets/UpdatedIcons.txt")))) or not isfile then
+                                    if (isfile and (not isfile("NewNight/"..SavePath.."/"..v.name) or not isfile("NewNight/Assets/UpdatedIcons.txt"))) or not isfile then
                                         DownloadAsset("/raw/refs/heads/main/"..v.path, "NewNight/"..SavePath.."/"..v.name)
                                     end
                                 end
