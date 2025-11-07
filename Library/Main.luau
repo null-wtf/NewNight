@@ -46,13 +46,15 @@ local UIData = {
     UIOpen = false,
     Windows = {
         Windows = {},
-        Dragging = nil :: Frame?
+        Dragging = nil :: Frame?,
+        DraggingSpeed = 0.05
     },
     TargetHud = nil,
     DashButtons = {},
     MobileButtons = {},
     Notifications = {},
     ConfigButtons = {},
+    ArrayListEntries = {},
     CustomizableItems = {
         Modules = {} :: {any},
         Other = {} :: {any}
@@ -375,7 +377,7 @@ do
             local XVal: number = FrameStart.X.Scale + (Delta.X / (Viewport.X / (Data.Window.Size.X.Scale + 0.8)))
             local YVal: number = FrameStart.Y.Scale + (Delta.Y / (Viewport.Y / 0.8))
 
-            Data.Window.Position = UDim2.fromScale(XVal, YVal)
+            TweenService:Create(Data.Window, TweenInfo.new(UIData.Windows.DraggingSpeed), {Position = UDim2.fromScale(XVal, YVal)}):Play()
         end
     end
 
@@ -435,6 +437,7 @@ do
     end
    
     Assets.Config = {}
+    Assets.ArrayList = {}
     function Assets.Config:Save(Data: {}, Path: string, Directories: {}?): boolean
         local Suc, NewData = pcall(HttpService.JSONEncode, HttpService, Data)
         if not isfolder("NewNight/Configs") then
@@ -600,41 +603,71 @@ do
         return true
     end
 
-    function Assets.Functions:LoadFile(Game: string, Github: string, LoadConfig: boolean)
-        local Path = "NewNight/Games/"..tostring(Game)..".luau"
+    function Assets.Functions:LoadFile(Game: string, LoadConfig: boolean?, Premium: boolean?)
+        local Path: string = "NewNight/Games/"..tostring(Game)..".luau"
+        local PremiumPath: string = "NewNight/Premium/Games/"..tostring(Game)..".luau"
+
         local Loaded: boolean = false
 
         if LoadConfig == nil then
             LoadConfig = true
         end
 
-        local suc, err = pcall(function()
-            if Night.Dev and isfile and isfile(Path) and readfile then
-                Loaded = true
-                loadstring(readfile(Path))()
-            else
-                Loaded = true
-                if RequestFunc then
-                    local Req = RequestFunc({
-                        Url = "https://raw.githubusercontent.com/null-wtf/NewNight/refs/heads/main/Games/"..Game..".luau",
-                        Method = "GET"
-                    })
+        if not Premium then
+            local suc, err = pcall(function()
+                if Night.Dev and isfile and isfile(Path) and readfile then
+                    Loaded = true
+                    loadstring(readfile(Path))()
+                else
+                    Loaded = true
+                    if RequestFunc then
+                        local Req = RequestFunc({
+                            Url = "https://raw.githubusercontent.com/null-wtf/NewNight/refs/heads/main/Games/"..Game..".luau",
+                            Method = "GET"
+                        })
 
-                    if Req.Success then
-                        loadstring(Req.Body)()
+                        if Req.Success then
+                            loadstring(Req.Body)()
+                        end
                     end
                 end
-            end
-        end)
+            end)
 
-        if not suc then
-            return Assets.Functions:CreateNotification({
-                Title = "Failed to load file: "..tostring(Game),
-                Description = "Failed to load file: "..tostring(Game)..": "..err
-            })
+            if not suc then
+                return Assets.Functions:CreateNotification({
+                    Title = "Failed to load file: "..tostring(Game),
+                    Description = "Failed to load file: "..tostring(Game)..": "..err
+                })
+            end
+        else
+            local suc, err = pcall(function()
+                if Night.Dev and isfile and isfile(PremiumPath) and readfile then
+                    Loaded = true
+                    loadstring(readfile(PremiumPath))()
+                else
+                    Loaded = true
+                    if RequestFunc then
+                        local Req = RequestFunc({
+                            Url = "https://raw.githubusercontent.com/null-wtf/NewNight/refs/heads/main/Premium/Games/"..Game..".luau",
+                            Method = "GET"
+                        })
+
+                        if Req.Success then
+                            loadstring(Req.Body)()
+                        end
+                    end
+                end
+            end)
+
+            if not suc then
+                return Assets.Functions:CreateNotification({
+                    Title = "Failed to load premium file: "..tostring(Game),
+                    Description = "Failed to load premium file: "..tostring(Game)..": "..err
+                })
+            end
         end
 
-        if Loaded and LoadConfig then
+        if Loaded and LoadConfig and not table.find(Night.IgnoreConfigs, tostring(Game)) then
             local ConfigPath: string = tostring(Game)
             if not isfolder("NewNight/Configs/"..ConfigPath) then
                 ConfigPath = tostring(Night.Game)
@@ -647,6 +680,10 @@ do
             if ConfigPath then
                 Assets.Config:Load(ConfigPath)
             end
+        end
+
+        if Night.Premium and not Premium then
+            Assets.Functions:LoadFile(Game, true, true)
         end
 
         return
@@ -676,6 +713,116 @@ NotificationHolder.BorderSizePixel = 0
 NotificationHolder.Position = UDim2.fromScale(0, 0)
 NotificationHolder.Size = UDim2.fromScale(1, 1)
 NotificationHolder.ZIndex = 1000
+
+local ArrayListHolder: Frame = Instance.new("Frame", MainScreenGui)
+ArrayListHolder.BackgroundTransparency = 1
+ArrayListHolder.BorderSizePixel = 0
+ArrayListHolder.AnchorPoint = Vector2.new(1, 0)
+ArrayListHolder.Position = UDim2.new(1, -10, 0, 10)
+ArrayListHolder.Size = UDim2.new(0.5, 0, 1, -10)
+ArrayListHolder.ZIndex = 1000
+
+Assets.ArrayList.Font = Font.new(Assets.Functions:GetFont("ProductSans", {{
+    Name = "Regular",
+    Weight = 600,
+    File = "Product-Sans-Regular",
+}}), Enum.FontWeight.Regular)
+
+Assets.ArrayList.TextSize = (Night.Mobile and 16) or 18
+Assets.ArrayList.Color = Color3.fromRGB(255, 255, 255)
+
+function Assets.ArrayList:Sort()
+    table.sort(UIData.ArrayListEntries, function(a, b)
+        local TotalTextA = a.Name
+        local TotalTextB = b.Name
+        
+        local SizeA = Assets.Functions:GetTextBounds(TotalTextA, Assets.ArrayList.Font, Assets.ArrayList.TextSize)
+        local SizeB = Assets.Functions:GetTextBounds(TotalTextB, Assets.ArrayList.Font, Assets.ArrayList.TextSize)
+
+        return SizeA.X > SizeB.X
+    end)
+    
+    for i,v in UIData.ArrayListEntries do
+        if v.Instances.Main then
+            if v.Instances.Main.Position.X.Scale > 1 then
+                v.Instances.Main.Position = UDim2.new(v.Instances.Main.Position.X.Scale, 0, 0, (Assets.ArrayList.TextSize + 6) * i)
+            end
+
+            TweenService:Create(v.Instances.Main, TweenInfo.new(0.2), {Position =  UDim2.new(1, 0, 0, (Assets.ArrayList.TextSize + 6) * i)}):Play()
+        end
+    end
+end
+
+function Assets.ArrayList:SetColor(Color: Color3)
+    for i,v in UIData.ArrayListEntries do
+        if v.Instances.Line and v.Instances.Text then
+            v.Instances.Line.BackgroundColor3 = Color
+            v.Instances.Text.TextColor3 = Color
+        end
+    end
+end
+
+function Assets.ArrayList:Push(Name: string)
+    local Data = {
+        Name = Name,
+        Instances = {
+            Main = nil,
+            Text = nil,
+            Line = nil
+        }
+    }
+
+    local MainSize: Vector2 = Assets.Functions:GetTextBounds(Name, Assets.ArrayList.Font, Assets.ArrayList.TextSize)
+
+    local MainFrame: Frame = Instance.new("Frame", ArrayListHolder)
+    MainFrame.BackgroundTransparency = 0.35
+    MainFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    MainFrame.BorderSizePixel = 0
+    MainFrame.Size = UDim2.fromOffset(MainSize.X + 14, Assets.ArrayList.TextSize + 6)
+    MainFrame.LayoutOrder = #UIData.ArrayListEntries
+    MainFrame.AnchorPoint = Vector2.new(1, 1)
+    MainFrame.Position = UDim2.new(1.2, 0, 0, (Assets.ArrayList.TextSize + 6) * math.clamp(#UIData.ArrayListEntries, 1, math.huge))
+    Data.Instances.Main = MainFrame
+
+    local Line: Frame = Instance.new("Frame", MainFrame)
+    Line.AnchorPoint = Vector2.new(1, 0)
+    Line.BackgroundColor3 = Assets.ArrayList.Color
+    Line.Size = UDim2.new(0, 2, 1, 0)
+    Line.Position = UDim2.fromScale(1, 0)
+    Line.BorderSizePixel = 0
+    Data.Instances.Line = Line
+
+    local MainText: TextLabel = Instance.new("TextLabel", MainFrame)
+    MainText.BackgroundTransparency = 1
+    MainText.FontFace = Assets.ArrayList.Font
+    MainText.Text = Name
+    MainText.TextColor3 = Assets.ArrayList.Color
+    MainText.TextSize = Assets.ArrayList.TextSize
+    MainText.TextXAlignment = Enum.TextXAlignment.Left
+    MainText.Size = UDim2.new(0, MainSize.X, 1, 0)
+    Data.Instances.Text = MainText
+    Instance.new("UIPadding", MainFrame).PaddingLeft = UDim.new(0, 6)
+
+    function Data:Remove()
+        local Tween: Tween = TweenService:Create(MainFrame, TweenInfo.new(0.2), {Position = UDim2.new(1.2, 0, 0, MainFrame.Position.Y.Offset)})
+        local Index: number? = table.find(UIData.ArrayListEntries, Data)
+        if Index then
+            table.remove(UIData.ArrayListEntries, Index)
+        end
+
+        Tween:Play()
+        Tween.Completed:Once(function() 
+            MainFrame:Destroy(MainFrame)
+        end)
+
+        Assets.ArrayList:Sort()
+    end
+
+    table.insert(UIData.ArrayListEntries, Data)
+
+    Assets.ArrayList:Sort()
+    return Data
+end
 
 function Assets.Functions:Uninject()
     if Night.OnUninject then
@@ -1514,7 +1661,9 @@ local function CreateWindow(Data: {Name: string, Flag: string, Size: UDim2, Posi
                     Keybind = nil :: string?,
                     SettingKeybind = false :: boolean,
                     SettingsOpenedOnce = false :: boolean,
-                    KeybindsToHide = {}
+                    KeybindsToHide = {},
+                    Tweening = false :: boolean,
+                    ArrayObject = nil,
                 },
                 Settings = {
                     MiniToggles = {},
@@ -1753,27 +1902,52 @@ local function CreateWindow(Data: {Name: string, Flag: string, Size: UDim2, Posi
                     Assets.Config:Save(Night.CurrentConfig, tostring(Night.Game).."/"..tostring(Night.CurrentConfig.ConfigName), {tostring(Night.Game)})
                 end
 
+                if Toggled then
+                    RealModuleData.MData.ArrayObject = Assets.ArrayList:Push(ModuleData.Name)
+                else
+                    if RealModuleData.MData.ArrayObject then
+                        RealModuleData.MData.ArrayObject:Remove()
+                    end
+                end
+
                 coroutine.wrap(function()
+                    repeat task.wait() until not RealModuleData or not RealModuleData.MData or not RealModuleData.MData.Tweening
+                    if not RealModuleData or not RealModuleData.MData then
+                        return
+                    end
+
+                    RealModuleData.MData.Tweening = true
                     if Toggled then
                         EnabledGradient.Enabled = true
                         DropShadowEnabledGradient.Enabled = true
-                        TweenService:Create(ModuleFrame, TweenInfo.new(0.1), {BackgroundColor3 = Color3.fromRGB(255, 255, 255)}):Play()
-                        TweenService:Create(DropShadow, TweenInfo.new(0.1), {BackgroundColor3 = Color3.fromRGB(255, 255, 255)}):Play()
-                        TweenService:Create(ModuleNameTextLabel, TweenInfo.new(0.1), {TextColor3 = Color3.fromRGB(210, 219, 229)}):Play()
-                        TweenService:Create(SettingsButton, TweenInfo.new(0.1), {ImageColor3 = Color3.fromRGB(210, 219, 229)}):Play()
+                        TweenService:Create(ModuleFrame, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(255, 255, 255)}):Play()
+                        TweenService:Create(DropShadow, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(255, 255, 255)}):Play()
+                        TweenService:Create(ModuleNameTextLabel, TweenInfo.new(0.15), {TextColor3 = Color3.fromRGB(210, 219, 229)}):Play()
+                        local End = TweenService:Create(SettingsButton, TweenInfo.new(0.15), {ImageColor3 = Color3.fromRGB(210, 219, 229)})
+                        End:Play()
+                        End.Completed:Once(function()
+                            RealModuleData.MData.Tweening = false
+                        end)
                     else
                         if RealModuleData.ConnectionsToDisconnectOnDisable then
                             table.clear(RealModuleData.ConnectionsToDisconnectOnDisable)
                         end
 
-                        TweenService:Create(SettingsButton, TweenInfo.new(0.1), {ImageColor3 = Color3.fromRGB(46, 54, 76)}):Play()
-                        TweenService:Create(ModuleNameTextLabel, TweenInfo.new(0.1), {TextColor3 = Color3.fromRGB(46, 54, 76)}):Play()
-                        TweenService:Create(DropShadow, TweenInfo.new(0.1), {BackgroundColor3 = Color3.fromRGB(11, 14, 18)}):Play()
-                        TweenService:Create(ModuleFrame, TweenInfo.new(0.1), {BackgroundColor3 = Color3.fromRGB(14, 16, 23)}):Play()
-                        task.delay(0.08, function()
+                        TweenService:Create(SettingsButton, TweenInfo.new(0.15), {ImageColor3 = Color3.fromRGB(46, 54, 76)}):Play()
+                        TweenService:Create(ModuleNameTextLabel, TweenInfo.new(0.15), {TextColor3 = Color3.fromRGB(46, 54, 76)}):Play()
+                        TweenService:Create(DropShadow, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(11, 14, 18)}):Play()
+                        local End = TweenService:Create(ModuleFrame, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(14, 16, 23)})
+                        task.delay(0.1, function()
                             if not RealModuleData.Enabled then
                                 DropShadowEnabledGradient.Enabled = false
                                 EnabledGradient.Enabled = false
+                            end
+                        end)
+
+                        End:Play()
+                        End.Completed:Once(function()
+                            if RealModuleData and RealModuleData.MData then
+                                RealModuleData.MData.Tweening = false
                             end
                         end)
                     end
@@ -1986,7 +2160,7 @@ local function CreateWindow(Data: {Name: string, Flag: string, Size: UDim2, Posi
                 ValueText.TextScaled = true
                 ValueText.TextWrapped = true
                 ValueText.TextXAlignment = Enum.TextXAlignment.Right
-                ValueText.Text = ""
+                ValueText.Text = tostring(SData.Default) or ""
 
                 local SliderBackground: Frame = Instance.new("Frame", SliderBase)
                 SliderBackground.BackgroundColor3 = Color3.fromRGB(14, 16, 23)
@@ -2191,7 +2365,10 @@ local function CreateWindow(Data: {Name: string, Flag: string, Size: UDim2, Posi
                 local RealColorSliderData = {
                     Data = CSData,
                     Value = "0, 0, 0" :: string,
+                    TableValue = {R = 0, G = 0, B = 0},
                     Dragging = false :: boolean,
+                    Rainbow = false :: boolean,
+                    LastClicked = 0 :: number,
                     Functions = {},
                     Connections = {}
                 }
@@ -2287,8 +2464,13 @@ local function CreateWindow(Data: {Name: string, Flag: string, Size: UDim2, Posi
                     MainBackground.Visible = Visible
                 end
 
-
-                function RealColorSliderData.Functions:SetValue(RGB: {R: number, G: number, B: number}, SaveConfig: boolean?, Load: boolean?)
+                function RealColorSliderData.Functions:SetValue(RGB: {R: number, G: number, B: number} | string, SaveConfig: boolean?, Load: boolean?)
+                    if typeof(RGB) == "string" and RGB == "Rainbow" then
+                        RealColorSliderData.Functions:Rainbow()
+                        return
+                    end
+                    
+                    RealColorSliderData.TableValue = RGB
                     RealColorSliderData.Value = tostring(RGB.R)..", "..tostring(RGB.G)..", "..tostring(RGB.B)
                     
                     local RGBValue: Color3 = Color3.fromRGB(RGB.R, RGB.G, RGB.B)
@@ -2307,8 +2489,41 @@ local function CreateWindow(Data: {Name: string, Flag: string, Size: UDim2, Posi
                     end
                 end
 
+                function RealColorSliderData.Functions:Rainbow()
+                    RealColorSliderData.Rainbow = true
+                    Assets.Connections:Add(task.spawn(function()
+                        repeat
+                            local Hue: number = math.clamp((math.sin((os.clock() * 1000) / 1000) * 120 + 240) / 360, 0, 1)
+                            local Color: Color3 = Color3.fromHSV(Hue, 1, 1)
+
+                            RealColorSliderData.Functions:SetValue(Assets.Functions:ConvertColor3toInt(Color), false)
+                            Circle.Position = UDim2.fromScale(Hue, -0.5)
+                            task.wait()
+                        until not RealColorSliderData or not RealColorSliderData.Rainbow
+                    end), {RealColorSliderData.Connections})
+                end
+
                 Assets.Connections:Add(RealColorSlider.MouseButton1Down:Connect(function()
+                    if 0.5 > (os.clock() - RealColorSliderData.LastClicked) then
+                        RealColorSliderData.Dragging = false
+                        RealColorSliderData.LastClicked = os.clock()
+                        RealColorSliderData.Functions:Rainbow()
+
+                        print("rainbow")
+                        Night.CurrentConfig.ColorSliders[RealColorSliderData.Data.Flag] = "Rainbow"
+                        Assets.Config:Save(Night.CurrentConfig, tostring(Night.Game).."/"..tostring(Night.CurrentConfig.ConfigName), {tostring(Night.Game)})
+                        return
+                    end
+
+                    if RealColorSliderData.Rainbow then
+                        Night.CurrentConfig.ColorSliders[RealColorSliderData.Data.Flag] = RealColorSliderData.TableValue
+                        Assets.Config:Save(Night.CurrentConfig, tostring(Night.Game).."/"..tostring(Night.CurrentConfig.ConfigName), {tostring(Night.Game)})
+                    end
+
+                    RealColorSliderData.Rainbow = false
                     RealColorSliderData.Dragging = true
+                    RealColorSliderData.LastClicked = os.clock()
+
                     UIData.InputFuncs.Changed = function(Input: InputObject)
                         if RealColorSliderData.Dragging and (Input.UserInputType == Enum.UserInputType.Touch or Input.UserInputType == Enum.UserInputType.MouseMovement) then
                             local ABX: number = RealColorSlider.AbsolutePosition.X
@@ -4006,6 +4221,18 @@ GUISettings:ColorSlider({
     end
 })
 
+GUISettings:Slider({
+    Name = "Drag Speed",
+    Flag = "UIDragSpeed",
+    Min = 0,
+    Max = 0.3,
+    Increment = 0.01,
+    Default = 0.05,
+    CallingFunction = function(self, value: boolean)
+        UIData.Windows.DraggingSpeed = value
+    end
+})
+
 local ScaleSlider = GUISettings:Slider({
     Name = "Scale",
     Flag = "GUIScaleSetting",
@@ -4042,6 +4269,26 @@ UISettingsWindow:CreateModule({
         end
     end
 })
+
+local ArrayListSetting = UISettingsWindow:CreateModule({
+    Name = "Array List",
+    Flag = "ArrayList",
+    Default = true,
+    CallingFunction = function(Self, Enabled: boolean)
+        ArrayListHolder.Visible = Enabled
+    end
+})
+
+ArrayListSetting:ColorSlider({
+    Name = "Color",
+    Flag = "ArrayListColor",
+    Default = Color3.fromRGB(255, 255, 255),
+    CallingFunction = function(self, color: Color3)
+        Assets.ArrayList:SetColor(color)
+        Assets.ArrayList.Color = color
+    end
+})
+
 
 Assets.Functions:CreateTab({
     Name = "Premium",
