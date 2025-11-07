@@ -33,7 +33,7 @@ local GameData = {
         Store = require(LocalPlayer.PlayerScripts.TS.ui.store).ClientStore,
         InventoryUtil = require(ReplicatedStorage.TS.inventory["inventory-util"]).InventoryUtil,
         ViewmodelController = Knit.Controllers.ViewmodelController,
-        MatchStates = require(ReplicatedStorage.TS.match["match-state"]),
+        MatchStates = require(ReplicatedStorage.TS.match["match-state"]).MatchState,
         Animation = require(ReplicatedStorage.rbxts_include.node_modules["@easy-games"]["game-core"].out).AnimationUtil,
         AnimationType = require(ReplicatedStorage.TS.animation["animation-type"]).AnimationType,
         ProdAnimations = require(ReplicatedStorage.TS.animation.definitions["prod-animations"]).ProdAnimations,
@@ -384,18 +384,18 @@ local function SwitchItem(Item: Instance)
         return
     end
 
-    local Found: boolean = false
-    for i,v in GameData.Utils.Store:getState().Inventory.observedInventory.hotbar do
-        if v.item and v.item.tool and v.item.tool == Item then
-            Found = true
-            GameData.Utils.Store:dispatch({
-                type = "InventorySelectHotbarSlot",
-                slot = (i - 1)
-            })
-        end
-    end
+    -- local Found: boolean = false
+    -- for i,v in GameData.Utils.Store:getState().Inventory.observedInventory.hotbar do
+    --     if v.item and v.item.tool and v.item.tool == Item then
+    --         Found = true
+    --         GameData.Utils.Store:dispatch({
+    --             type = "InventorySelectHotbarSlot",
+    --             slot = (i - 1)
+    --         })
+    --     end
+    -- end
 
-    if not Found then
+    -- if not Found then
         local Completed: boolean = false
         GameData.Utils.Remotes:Get("SetInvItem"):CallServerAsync({
             hand = Item
@@ -404,28 +404,28 @@ local function SwitchItem(Item: Instance)
         end)
 
         repeat task.wait() until Completed
-    else
-        local CompTime: number = os.clock()
-        repeat 
-            local HandItem = LocalPlayer.Character:FindFirstChild("HandInvItem")
-            if HandItem and HandItem:IsA("ObjectValue") then
-                HandItem = HandItem.Value
-            else
-                local Inventory = GetInventory()
-                if Inventory and Inventory.hand then
-                    HandItem = Inventory.hand.tool
-                end
-            end
+    -- else
+    --     local CompTime: number = os.clock()
+    --     repeat 
+    --         local HandItem = LocalPlayer.Character:FindFirstChild("HandInvItem")
+    --         if HandItem and HandItem:IsA("ObjectValue") then
+    --             HandItem = HandItem.Value
+    --         else
+    --             local Inventory = GetInventory()
+    --             if Inventory and Inventory.hand then
+    --                 HandItem = Inventory.hand.tool
+    --             end
+    --         end
 
-            if HandItem == Item then
-                break
-            end
+    --         if HandItem == Item then
+    --             break
+    --         end
 
-            task.wait() 
-        until false or (os.clock() - CompTime) > ((Stats and (Stats.Ping:GetValue() / 1000) + 0.05) or 0.2)
+    --         task.wait() 
+    --     until false or (os.clock() - CompTime) > ((Stats and (Stats.Ping:GetValue() / 1000) + 0.05) or 0.2)
 
-        task.wait(0.001)
-    end
+    --     task.wait(0.001)
+    -- end
 end
 
 local function IsPathClear(target: Instance, TargetPart: Part?, Param: RaycastParams): boolean
@@ -844,13 +844,18 @@ Windows.Movement.Modules.UniversalNoClip:Destroy();
             Speed = 50,
             PulseDelay = 0,
             PulseTime = 2,
+            DamageBoostSpeed = 50,
+            DamageBoostTime = 1,
+            DamageBoostCooldown = 0.8,
             Mode = "Velocity",
             AutoJump = false,
             Pulse = false,
-            UseBoost = false
+            UseBoost = false,
+            DamageBoost = false
         },
         Data = {
-            LastGroundTouch = os.clock()
+            LastGroundTouch = os.clock(),
+            LastDamaged = os.clock()
         }
     }
 
@@ -859,7 +864,15 @@ Windows.Movement.Modules.UniversalNoClip:Destroy();
         Flag = "Speed",
         CallingFunction = function(self, enabled: boolean)
             if enabled then
-                repeat
+                self:Connection(GameData.Events.Damage.Event:Connect(function(Values)
+                    if Values.Type.Value ~= "FALL" and Values.DamagedPlayer == LocalPlayer then
+                        if SpeedData.Settings.DamageBoostCooldown < (os.clock() - SpeedData.Data.LastDamaged) then
+                            SpeedData.Data.LastDamaged = os.clock()      
+                        end                  
+                    end
+                end))
+
+                self:Connection(RunService.PreRender:Connect(function(delta: number)
                     local Fly = Windows.Movement.Modules.Fly
                     if Night:IsAlive(LocalPlayer) and (Fly and not Fly.Enabled or not Fly) and isnetworkowner(LocalPlayer.Character.PrimaryPart) then
                         local Root: BasePart = LocalPlayer.Character.PrimaryPart
@@ -889,15 +902,20 @@ Windows.Movement.Modules.UniversalNoClip:Destroy();
                                     break
                                 end
 
+                                if SpeedData.Settings.DamageBoost and SpeedData.Settings.DamageBoostTime > (os.clock() - SpeedData.Data.LastDamaged) then
+                                    Speed = SpeedData.Settings.DamageBoostSpeed
+                                end
+
                                 local CurrentVelocity: Vector3 = Root.AssemblyLinearVelocity
                                 if SpeedData.Settings.UseBoost then
                                     local Multiplier: number = GetSpeedMultiplier()
                                     if Multiplier ~= 0 then
                                         Speed = math.clamp(Speed * Multiplier, 0, 46)
+                                        Root.AssemblyLinearVelocity = Vector3.new(Humanoid.MoveDirection.X * Speed, CurrentVelocity.Y, Humanoid.MoveDirection.Z * Speed) 
                                     end 
                                 end
                                 
-                                Root.AssemblyLinearVelocity = Vector3.new(Humanoid.MoveDirection.X * Speed, CurrentVelocity.Y, Humanoid.MoveDirection.Z * Speed) 
+                                Root.CFrame += (Humanoid.MoveDirection * (Speed * delta)) * delta
                                 if SpeedData.Settings.Pulse then
                                     task.wait(0.01)
                                 end
@@ -908,8 +926,7 @@ Windows.Movement.Modules.UniversalNoClip:Destroy();
                             end
                         end
                     end
-                    task.wait()
-                until not self.Enabled
+                end))
             end
         end
     })
@@ -922,6 +939,41 @@ Windows.Movement.Modules.UniversalNoClip:Destroy();
         Max = 23,
         CallingFunction = function(self, value: number)
             SpeedData.Settings.Speed = value
+        end
+    })
+
+    local DamageBoostSpeed = Speed:Slider({
+        Name = "Damage Boost Speed",
+        Flag = "DamageSpeedValue",
+        Default = 35,
+        Min = 0,
+        Max = 60,
+        CallingFunction = function(self, value: number)
+            SpeedData.Settings.DamageBoostSpeed = value
+        end
+    })
+
+    local DamageBoostTime = Speed:Slider({
+        Name = "Damage Boost Time",
+        Flag = "DamageBoostTimeValue",
+        Default = 2,
+        Min = 0.1,
+        Max = 2,
+        Increment = 0.01,
+        CallingFunction = function(self, value: number)
+            SpeedData.Settings.DamageBoostTime = value
+        end
+    })
+
+    local DamageBoostDelay = Speed:Slider({
+        Name = "Damage Boost Delay",
+        Flag = "DamageBoostDelayValue",
+        Default = 0.8,
+        Min = 0.1,
+        Max = 2,
+        Increment = 0.01,
+        CallingFunction = function(self, value: number)
+            SpeedData.Settings.DamageBoostCooldown = value
         end
     })
 
@@ -966,6 +1018,18 @@ Windows.Movement.Modules.UniversalNoClip:Destroy();
         Default = true,
         CallingFunction = function(self, value: boolean)
             SpeedData.Settings.UseBoost = value
+        end
+    })
+    
+    Speed:MiniToggle({
+        Name = "Daamge Boost",
+        Flag = "SpeedDamageBoost",
+        Default = true,
+        CallingFunction = function(self, value: boolean)
+            SpeedData.Settings.DamageBoost = value
+            DamageBoostSpeed:SetVisiblity(value)
+            DamageBoostTime:SetVisiblity(value)
+            DamageBoostDelay:SetVisiblity(value)
         end
     })
     
@@ -1036,7 +1100,7 @@ end)();
                     FlyData.Data.FlyBar = Night:Countdown(2.5)
                 end
 
-                repeat
+                self:Connection(RunService.PreRender:Connect(function(delta: number)
                     if Night:IsAlive(LocalPlayer) and isnetworkowner(LocalPlayer.Character.PrimaryPart) then
                         local Root: BasePart = LocalPlayer.Character.PrimaryPart
                         local Humanoid: Humanoid = LocalPlayer.Character.Humanoid
@@ -1072,16 +1136,15 @@ end)();
                                     local Multiplier: number = GetSpeedMultiplier()
                                     if Multiplier ~= 0 then
                                         Speed = math.clamp(Speed * Multiplier, 0, 46)
+
+                                        if Humanoid.MoveDirection.Magnitude > 0 then
+                                            SpeedVelocity = Vector3.new(Humanoid.MoveDirection.X * Speed, 0, Humanoid.MoveDirection.Z * Speed) 
+                                        end
                                     end 
                                 end
-
-                                SpeedVelocity = Vector3.new(Humanoid.MoveDirection.X * Speed, 0, Humanoid.MoveDirection.Z * Speed) 
                             end
 
-                            if Humanoid.MoveDirection.Magnitude <= 0 then
-                                SpeedVelocity = Vector3.zero
-                            end
-
+                            Root.CFrame += (Humanoid.MoveDirection * (Speed * delta)) * delta
                             Root.AssemblyLinearVelocity = Vector3.new(
                                 SpeedVelocity.X,
                                 YValue + (CurrentVelocity.Y > 0 and 1 or -CurrentVelocity.Y),
@@ -1112,18 +1175,13 @@ end)();
                             if FlyData.Data.FlyBar then
                                 FlyData.Data.FlyBar:Update(string.format("%.1f", (FlyData.Data.LastOnGround + 2.5) - os.clock()))
                             end
-
-                            if FlyData.Settings.Pulse and (os.clock() - FlyData.Data.LastBoosted) >= FlyData.Settings.PulseDelay then
-                                task.wait(0.01)
-                            end
                         end
 
                         if (os.clock() - FlyData.Data.LastBoosted) >= FlyData.Settings.PulseDelay then
                             FlyData.Data.LastBoosted = os.clock()
                         end
                     end
-                    task.wait()
-                until not self.Enabled
+                end))
             else
                 if FlyData.Data.FlyBar then
                     FlyData.Data.FlyBar:Destroy()
@@ -1388,7 +1446,7 @@ end)();
                     end
 
                     local Sword = GetSword()
-                    if Sword.Item and GameData.Utils.Store:getState().Game.matchstate == GameData.Utils.MatchStates.RUNNING and Night:IsAlive(LocalPlayer) then                        
+                    if Sword.Item and GameData.Utils.Store:getState().Game.matchState == GameData.Utils.MatchStates.RUNNING and Night:IsAlive(LocalPlayer) then                        
                         if KillAuraData.Settings.TriggerButton and not KillAuraData.Data.TriggerHeld then
                             task.wait()
                             return
@@ -1517,7 +1575,7 @@ end)();
                             end
 
                             if KillAuraData.Settings.Range >= NearestEntity.Distance then
-                                local HitPos: Vector3 = (math.clamp(NearestEntity.Distance - 14, 10, 30) * (NearestEntity.Entity.PrimaryPart.Position - LocalPlayer.Character.PrimaryPart.Position).Unit) + LocalPlayer.Character.PrimaryPart.Position
+                                local HitPos: Vector3 = (math.clamp(NearestEntity.Distance - 14.4, 10, 30) * (NearestEntity.Entity.PrimaryPart.Position - LocalPlayer.Character.PrimaryPart.Position).Unit) + LocalPlayer.Character.PrimaryPart.Position
                                 GameData.Utils.Remotes:Get("SwordHit"):SendToServer({
                                     entityInstance = NearestEntity.Entity,
                                     chargedAttack = {chargeRatio = 0},
@@ -3545,18 +3603,20 @@ end)();
 
                 local Boosted: boolean = false
                 if Mode == "Boost" then
-                    repeat
+                    self:Connection(RunService.PreRender:Connect(function(delta: number)
                         if not Boosted then
                             local RealSpeed: number = Speed
                             if UseBoost then
                                 local Multiplier: number = GetSpeedMultiplier()
                                 if Multiplier ~= 0 then
-                                    RealSpeed *= Multiplier
+                                    RealSpeed += (Multiplier - 10)
                                 end
                             end
 
                             RealSpeed = CombatCheck and 0 < #GameData.Data.KillAuraTargets and (RealSpeed / 2) or RealSpeed
-                            PrimaryPart.AssemblyLinearVelocity = Vector3.new(Humanoid.MoveDirection.X * RealSpeed, Height, Humanoid.MoveDirection.Z * RealSpeed)      
+                            PrimaryPart.CFrame += (Humanoid.MoveDirection * (RealSpeed * delta))
+
+                            PrimaryPart.AssemblyLinearVelocity = Vector3.new(PrimaryPart.AssemblyLinearVelocity.X, Height, PrimaryPart.AssemblyLinearVelocity.Z)      
                         end
                         
                         Boosted = not Boosted
@@ -3565,9 +3625,10 @@ end)();
                             TimeUI:Update(string.format("%.1f", (StartTime + Time) - os.clock()))
                         end
 
-                        task.wait()
-                    until not self.Enabled or (os.clock() - StartTime) >= Time
-                    self:SetValue(false)
+                        if (os.clock() - StartTime) >= Time then
+                            self:SetValue(false)
+                        end
+                    end))
                 else
                     local Velocity = VeloHeight + 5
                     task.spawn(function()
@@ -5892,6 +5953,7 @@ end)();
 end)();
 
 (function()
+    -- uhh ignore for rn fr ill sort another time
     local Distance = 20
     Windows.Utility:CreateModule({
         Name = "Bed Protector",
