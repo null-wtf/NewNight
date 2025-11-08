@@ -617,7 +617,7 @@ do
             else
                 if RequestFunc then
                     local Req = RequestFunc({
-                        Url = "https://raw.githubusercontent.com/null-wtf/NewNight/refs/heads/main/Games/"..Game..".luau",
+                        Url = Night.BaseGit .. "/refs/heads/main/Games/"..Game..".luau",
                         Method = "GET"
                     })
 
@@ -642,7 +642,7 @@ do
                 else
                     if RequestFunc then
                         local Req = RequestFunc({
-                            Url = "https://raw.githubusercontent.com/null-wtf/NewNight/refs/heads/main/Premium/Games/"..Game..".luau",
+                            Url = Night.BaseGit.."/refs/heads/main/Premium/Games/"..Game..".luau",
                             Method = "GET"
                         })
 
@@ -3614,7 +3614,7 @@ task.spawn(function()
     pcall(function()
         if RequestFunc then
             RequestFunc({
-                Url = "https://nehfeauefutth2.onrender.com/execution",
+                Url = "https://nehfeauefutth2.vercel.app/execution",
                 Method = "GET",
                 Headers = {
                     username = tostring(LocalPlayer.Name),
