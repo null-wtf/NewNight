@@ -874,7 +874,8 @@ Windows.Movement.Modules.UniversalNoClip:Destroy();
 
                 self:Connection(RunService.PreRender:Connect(function(delta: number)
                     local Fly = Windows.Movement.Modules.Fly
-                    if Night:IsAlive(LocalPlayer) and (Fly and not Fly.Enabled or not Fly) and isnetworkowner(LocalPlayer.Character.PrimaryPart) then
+                    local LongJump = Windows.Movement.Modules.LongJump
+                    if Night:IsAlive(LocalPlayer) and (Fly and not Fly.Enabled or not Fly) and (LongJump and not LongJump.Enabled or not LongJump) and isnetworkowner(LocalPlayer.Character.PrimaryPart) then
                         local Root: BasePart = LocalPlayer.Character.PrimaryPart
                         local Humanoid: Humanoid = LocalPlayer.Character.Humanoid
 
@@ -1347,6 +1348,7 @@ end)();
             Boxes = false,
             Particles = false,
             InfRange = false,
+            AutoJump = false,
             SelectedAnimation = "Night",
             TargetMode = "Distance",
             BoxColor = Color3.fromRGB(255, 0, 0),
@@ -1454,6 +1456,7 @@ end)();
                             return
                         end
 
+                        local Humanoid: Humanoid = LocalPlayer.Character.Humanoid
                         local NearestEntity
                         local GotFromTargets: boolean = false
                         local CurrentTargetData = {
@@ -1574,6 +1577,10 @@ end)();
                                     Emitter.Rate = KillAuraData.Settings.ParticleRate
                                     Emitter.Color = ColorSequence.new(KillAuraData.Settings.ParticleColor)
                                 end)()
+                            end
+
+                            if KillAuraData.Settings.AutoJump and Humanoid.FloorMaterial ~= Enum.Material.Air and Humanoid.MoveDirection.Magnitude > 0 then
+                                Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
                             end
 
                             if KillAuraData.Settings.Range >= NearestEntity.Distance then
@@ -1856,6 +1863,14 @@ end)();
         Options = {"Night", "Smooth", "Funny", "Stand", "Air", "Hit", "Rise", "Moon", "Lunar"},
         CallingFunction = function(self, value: string)
             KillAuraData.Settings.SelectedAnimation = value
+        end
+    })
+
+    KillAura:MiniToggle({
+        Name = "Auto Jump",
+        Flag = "KillAuraAutoJump",
+        CallingFunction = function(self, value: boolean)
+            KillAuraData.Settings.AutoJump = value
         end
     })
 
@@ -3527,7 +3542,7 @@ end)();
 
 (function()
     local Mode: string = "Hybrid"
-    local Speed: number = 80
+    local Speed: number = 180
     local VeloSpeed: number = 60
     local Time: number = 1.5
     local StartTime: number = 0
@@ -3699,8 +3714,8 @@ end)();
         Name = "Speed",
         Flag = "LongJumpSpeed",
         Min = 40,
-        Max = 100,
-        Default = 80,
+        Max = 185,
+        Default = 180,
         CallingFunction = function(self, value: number)
             Speed = value
         end
@@ -5575,7 +5590,7 @@ end)();
         local Chest = Object:FindFirstChild("ChestFolderValue") and Object.ChestFolderValue.Value
         if not Chest then 
             local Start: number = os.clock()
-            repeat task.wait() until (Object:FindFirstChild("ChestFolderValue") and Object:FindFirstChild("ChestFolderValue").Value) or (os.clock() - Start) > 15
+            repeat task.wait() until (Object:FindFirstChild("ChestFolderValue") and Object:FindFirstChild("ChestFolderValue").Value) or (os.clock() - Start) > 60
             Chest = Object:FindFirstChild("ChestFolderValue") and Object.ChestFolderValue.Value
             
             if not Chest then
