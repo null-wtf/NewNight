@@ -841,7 +841,7 @@ Windows.Movement.Modules.UniversalNoClip:Destroy();
 (function()
     local SpeedData = {
         Settings = {
-            Speed = 50,
+            Speed = 23,
             PulseDelay = 0,
             PulseTime = 2,
             DamageBoostSpeed = 50,
@@ -872,7 +872,7 @@ Windows.Movement.Modules.UniversalNoClip:Destroy();
                     end
                 end))
 
-                self:Connection(RunService.PreRender:Connect(function(delta: number)
+                self:Connection(RunService.PreSimulation:Connect(function(delta: number)
                     local Fly = Windows.Movement.Modules.Fly
                     if Night:IsAlive(LocalPlayer) and (Fly and not Fly.Enabled or not Fly) and isnetworkowner(LocalPlayer.Character.PrimaryPart) then
                         local Root: BasePart = LocalPlayer.Character.PrimaryPart
@@ -906,16 +906,17 @@ Windows.Movement.Modules.UniversalNoClip:Destroy();
                                     Speed = SpeedData.Settings.DamageBoostSpeed
                                 end
 
+                                local NewSpeed: number = Speed
                                 local CurrentVelocity: Vector3 = Root.AssemblyLinearVelocity
                                 if SpeedData.Settings.UseBoost then
                                     local Multiplier: number = GetSpeedMultiplier()
                                     if Multiplier ~= 0 then
-                                        Speed = math.clamp(Speed * Multiplier, 0, 46)
-                                        Root.AssemblyLinearVelocity = Vector3.new(Humanoid.MoveDirection.X * Speed, CurrentVelocity.Y, Humanoid.MoveDirection.Z * Speed) 
+                                        NewSpeed = math.clamp(Speed * Multiplier, 0, 46)
                                     end 
                                 end
                                 
-                                Root.CFrame += (Humanoid.MoveDirection * (Speed * delta)) * delta
+                                Root.CFrame += Humanoid.MoveDirection * math.clamp(Speed - 22, 0, math.huge) * delta
+                                Root.AssemblyLinearVelocity = Vector3.new(Humanoid.MoveDirection.X * NewSpeed, CurrentVelocity.Y, Humanoid.MoveDirection.Z * NewSpeed)
                                 if SpeedData.Settings.Pulse then
                                     task.wait(0.01)
                                 end
@@ -1131,20 +1132,21 @@ end)();
                                 end
                             end
 
+                            local NewSpeed: number = Speed
                             if ((os.clock() - FlyData.Data.LastBoosted) >= FlyData.Settings.PulseDelay or not FlyData.Settings.Pulse) then
                                 if FlyData.Settings.UseBoost then
                                     local Multiplier: number = GetSpeedMultiplier()
                                     if Multiplier ~= 0 then
-                                        Speed = math.clamp(Speed * Multiplier, 0, 46)
-
-                                        if Humanoid.MoveDirection.Magnitude > 0 then
-                                            SpeedVelocity = Vector3.new(Humanoid.MoveDirection.X * Speed, 0, Humanoid.MoveDirection.Z * Speed) 
-                                        end
+                                        NewSpeed = math.clamp(Speed * Multiplier, 0, 46)
                                     end 
                                 end
                             end
 
-                            Root.CFrame += (Humanoid.MoveDirection * (Speed * delta)) * delta
+                            if Humanoid.MoveDirection.Magnitude > 0 then
+                                SpeedVelocity = Vector3.new(Humanoid.MoveDirection.X * NewSpeed, 0, Humanoid.MoveDirection.Z * NewSpeed) 
+                            end
+
+                            Root.CFrame += Humanoid.MoveDirection * math.clamp(Speed - 22, 0, math.huge) * delta
                             Root.AssemblyLinearVelocity = Vector3.new(
                                 SpeedVelocity.X,
                                 YValue + (CurrentVelocity.Y > 0 and 1 or -CurrentVelocity.Y),
