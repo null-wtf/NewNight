@@ -607,45 +607,39 @@ do
         local Path: string = "NewNight/Games/"..tostring(Game)..".luau"
         local PremiumPath: string = "NewNight/Premium/Games/"..tostring(Game)..".luau"
 
-        local Loaded: boolean = false
-
         if LoadConfig == nil then
             LoadConfig = true
         end
 
-        if not Premium then
-            local suc, err = pcall(function()
-                if Night.Dev and isfile and isfile(Path) and readfile then
-                    Loaded = true
-                    loadstring(readfile(Path))()
-                else
-                    Loaded = true
-                    if RequestFunc then
-                        local Req = RequestFunc({
-                            Url = "https://raw.githubusercontent.com/null-wtf/NewNight/refs/heads/main/Games/"..Game..".luau",
-                            Method = "GET"
-                        })
+        local suc, err = pcall(function()
+            if Night.Dev and isfile and isfile(Path) and readfile then
+                loadstring(readfile(Path))()
+            else
+                if RequestFunc then
+                    local Req = RequestFunc({
+                        Url = "https://raw.githubusercontent.com/null-wtf/NewNight/refs/heads/main/Games/"..Game..".luau",
+                        Method = "GET"
+                    })
 
-                        if Req.Success then
-                            loadstring(Req.Body)()
-                        end
+                    if Req.Success then
+                        loadstring(Req.Body)()
                     end
                 end
-            end)
-
-            if not suc then
-                return Assets.Functions:CreateNotification({
-                    Title = "Failed to load file: "..tostring(Game),
-                    Description = "Failed to load file: "..tostring(Game)..": "..err
-                })
             end
-        else
-            local suc, err = pcall(function()
+        end)
+
+        if not suc then
+            return Assets.Functions:CreateNotification({
+                Title = "Failed to load file: "..tostring(Game),
+                Description = "Failed to load file: "..tostring(Game)..": "..err
+            })
+        end
+
+        if Night.Premium and Game ~= "Universal" then
+            local suc2, err2 = pcall(function()
                 if Night.Dev and isfile and isfile(PremiumPath) and readfile then
-                    Loaded = true
                     loadstring(readfile(PremiumPath))()
                 else
-                    Loaded = true
                     if RequestFunc then
                         local Req = RequestFunc({
                             Url = "https://raw.githubusercontent.com/null-wtf/NewNight/refs/heads/main/Premium/Games/"..Game..".luau",
@@ -659,31 +653,27 @@ do
                 end
             end)
 
-            if not suc then
+            if not suc2 then
                 return Assets.Functions:CreateNotification({
                     Title = "Failed to load premium file: "..tostring(Game),
-                    Description = "Failed to load premium file: "..tostring(Game)..": "..err
+                    Description = "Failed to load premium file: "..tostring(Game)..": "..err2
                 })
             end
         end
 
-        if Loaded and LoadConfig and not table.find(Night.IgnoreConfigs, tostring(Game)) then
+        if LoadConfig and not table.find(Night.IgnoreConfigs, tostring(Game)) then
             local ConfigPath: string = tostring(Game)
-            if not isfolder("NewNight/Configs/"..ConfigPath) then
+            if not isfolder("NewNight/Configs/"..ConfigPath) and not table.find(Night.IgnoreConfigs, tostring(Night.Game)) then
                 ConfigPath = tostring(Night.Game)
             end
 
-            if isfile("NewNight/Configs/"..ConfigPath.."/LastUsed.txt") then
+            if ConfigPath and isfile("NewNight/Configs/"..ConfigPath.."/LastUsed.txt") then
                 ConfigPath = ConfigPath.."/"..readfile("NewNight/Configs/"..ConfigPath.."/LastUsed.txt")
             end
 
             if ConfigPath then
                 Assets.Config:Load(ConfigPath)
             end
-        end
-
-        if Night.Premium and not Premium then
-            Assets.Functions:LoadFile(Game, true, true)
         end
 
         return
@@ -1089,7 +1079,7 @@ function Assets.Functions:CreateNotification(Data: {Title: string, Description: 
 
     if ShrinkText then
         if TitleBigger then
-            Title.TextSize = 14
+            Title.TextSize = 10
         end
         Description.TextSize = 12
     end
