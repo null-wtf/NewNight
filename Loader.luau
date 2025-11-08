@@ -20,7 +20,7 @@ local Camera: Camera = workspace.CurrentCamera
 local BaseGit: string = "https://github.com/null-wtf/NewNight"
 local NightInit: {[any]: any} = getgenv().NightInit or {}
 local Night = {
-    Version = "3.06",
+    Version = "3.07",
     BaseGit = BaseGit,
     Scale = 0.9,
     Keybind = Enum.KeyCode.RightShift,
@@ -154,7 +154,7 @@ end
 Night.Assets.Functions.DownloadDirectory = DownloadDirectory
 Night.Assets.Functions.DownloadAsset = DownloadAsset
 
-Night:LoadFile("Universal")
+Night:LoadFile("Universal", false)
 Night:LoadFile(Night.Game)
 
 if queue_on_teleport then
