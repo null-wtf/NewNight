@@ -872,7 +872,7 @@ Windows.Movement.Modules.UniversalNoClip:Destroy();
                     end
                 end))
 
-                self:Connection(RunService.PreSimulation:Connect(function(delta: number)
+                self:Connection(RunService.PreRender:Connect(function(delta: number)
                     local Fly = Windows.Movement.Modules.Fly
                     if Night:IsAlive(LocalPlayer) and (Fly and not Fly.Enabled or not Fly) and isnetworkowner(LocalPlayer.Character.PrimaryPart) then
                         local Root: BasePart = LocalPlayer.Character.PrimaryPart
