@@ -617,7 +617,7 @@ do
             else
                 if RequestFunc then
                     local Req = RequestFunc({
-                        Url = Night.BaseGit .. "/refs/heads/main/Games/"..Game..".luau",
+                        Url = "https://raw.githubusercontent.com/null-wtf/NewNight/refs/heads/main/Games/"..Game..".luau",
                         Method = "GET"
                     })
 
@@ -642,7 +642,7 @@ do
                 else
                     if RequestFunc then
                         local Req = RequestFunc({
-                            Url = Night.BaseGit.."/refs/heads/main/Premium/Games/"..Game..".luau",
+                            Url = "https://raw.githubusercontent.com/null-wtf/NewNight/refs/heads/main/Premium/Games/"..Game..".luau",
                             Method = "GET"
                         })
 
