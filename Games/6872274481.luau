@@ -40,7 +40,7 @@ local GameData = {
         BlockEngine = BlockEngine.BlockEngine,
         BlockRemotes = BlockEngine.BlockEngineRemotes.Client,
         BlockBreaker = Knit.Controllers.BlockBreakController.blockBreaker,
-        TeamUtil = require(ReplicatedStorage.TS.util["team-util"]),
+        TeamController = Knit.Controllers.TeamController,
         Sprint = Knit.Controllers.SprintController,
         Knockback = require(ReplicatedStorage.TS.damage["knockback-util"]).KnockbackUtil,
         Chest = Knit.Controllers.ChestController,
@@ -151,15 +151,15 @@ task.spawn(function()
 end)
 
 local BlockList: {Instance} = CollectionService:GetTagged("block")
-CollectionService:GetInstanceAddedSignal("block"):Connect(function(inst: Instance) table.insert(BlockList, inst) end)
-CollectionService:GetInstanceRemovedSignal("block"):Connect(function(inst: Instance)
+Assets.Connections:Add(CollectionService:GetInstanceAddedSignal("block"):Connect(function(inst: Instance) table.insert(BlockList, inst) end))
+Assets.Connections:Add(CollectionService:GetInstanceRemovedSignal("block"):Connect(function(inst: Instance)
     for i, v in next, BlockList do
         if v == inst then
             table.remove(BlockList, i)
             break
         end
     end
-end)
+end))
 
 local function Warning(Title: string, Description: string, Duration: number)
     pcall(function()
@@ -188,6 +188,16 @@ end
 local function GetInventory(Player: Player?)
     Player = Player or LocalPlayer
     return GameData.Utils.InventoryUtil.getInventory(Player)
+end
+
+
+local function GetPlayersTeam(Player: Player): string
+    local PlayerTeam = GameData.Utils.TeamController:getPlayerTeam(Player)
+    if PlayerTeam and PlayerTeam.id then
+        return PlayerTeam.id
+    end
+
+    return
 end
 
 local function GetSword(): {AttackSpeed: number, Damage: number, Item: Instance?, Meta: {itemType: string}}
@@ -713,7 +723,7 @@ local function FindWeakestSide(Bed: Part)
     for i, v in BlocksA do
         BlockASides[i] = 0
         for i2, v2 in v do
-            if not v2.Block:GetAttribute("NoBreak") and not v2.Block:GetAttribute("Team"..tostring(GameData.Utils.TeamUtil.getPlayerTeamId(LocalPlayer).."NoBreak")) and v2.Block ~= Bed then
+            if not v2.Block:GetAttribute("NoBreak") and not v2.Block:GetAttribute("Team"..tostring(GetPlayersTeam(LocalPlayer).."NoBreak")) and v2.Block ~= Bed then
                 local BlockData = GameData.Utils.BlockEngine:getStore():getBlockData(v2.BlockPosition)
                 local BlockHealth = BlockData and BlockData:GetAttribute(GameData.Utils.BlockEngine:getDefaultHealthKey())
                 if not BlockData or not BlockHealth then
@@ -728,7 +738,7 @@ local function FindWeakestSide(Bed: Part)
     for i, v in BlocksB do
         BlockBSides[i] = 0
         for i2, v2 in v do
-            if not v2.Block:GetAttribute("NoBreak") and not v2.Block:GetAttribute("Team"..tostring(GameData.Utils.TeamUtil.getPlayerTeamId(LocalPlayer).."NoBreak")) and v2.Block ~= Bed then
+            if not v2.Block:GetAttribute("NoBreak") and not v2.Block:GetAttribute("Team"..tostring(GetPlayersTeam(LocalPlayer).."NoBreak")) and v2.Block ~= Bed then
                 local BlockData = GameData.Utils.BlockEngine:getStore():getBlockData(v2.BlockPosition)
                 local BlockHealth = BlockData and BlockData:GetAttribute(GameData.Utils.BlockEngine:getDefaultHealthKey())
                 if not BlockData or not BlockHealth then
@@ -756,7 +766,7 @@ local function FindWeakestSide(Bed: Part)
 end
 
 local function GetNearestBed(IgnoreTeam: boolean?, IgnoreCanBreak: boolean?): { Bed: Part, Distance: any }
-    local PlayerTeamId: number = GameData.Utils.TeamUtil.getPlayerTeamId(LocalPlayer)
+    local PlayerTeamId: number = GetPlayersTeam(LocalPlayer)
     local Data = {
         Bed = nil,
         Distance = math.huge
@@ -2359,8 +2369,10 @@ end)();
 
                             local Result = DamageBlock(Item.Block, LastHitNormal)
                             if Result == "cancelled" then
-                                task.wait(0.5)
+                                task.wait(0.15)
                             end
+
+                            task.wait(0.05)
                         end
                     end
                     task.wait()
@@ -4178,7 +4190,7 @@ end)();
                         continue
                     end
 
-                    if Night:IsAlive(LocalPlayer) and NearestEntity.Entity then
+                    if Night:IsAlive(LocalPlayer) and NearestEntity.Entity and GameData.Utils.Store:getState().Game.matchState == GameData.Utils.MatchStates.RUNNING then
                         if not AntiHitData.Data.Clone then
                             AntiHitData.Data.Clone = MakeClone()
                         end
@@ -4723,7 +4735,7 @@ end
         CallingFunction = function(self, enabled: boolean)
             if enabled then
                 Part = Instance.new("Part", workspace)
-                Part.Position = Vector3.new(0, GetYLevel(), 0)
+                Part.Position = Vector3.new(0, GetYLevel() - 6, 0)
                 Part.Size = Vector3.new(100000, 1, 100000)
                 Part.Color = AntiVoidData.Color
                 Part.Anchored = true
@@ -5244,7 +5256,7 @@ end)();
         CallingFunction = function(self, enabled: boolean)
             if enabled then
                 self:Connection(GameData.Events.Death.Event:Connect(function(Value)
-                    if AutoToxicData.Kill and Value.Killer == LocalPlayer.Character and (AutoToxicData.Final and Value.Final or not AutoToxicData.Final) then
+                    if AutoToxicData.Kill and Value.Killer == LocalPlayer.Character and Value.KilledPlayer ~= LocalPlayer.Character and (AutoToxicData.Final and Value.Final or not AutoToxicData.Final) then
                         TextChatService.TextChannels.RBXGeneral:SendAsync(GetRandomMessage("Kill", {["<PLR>"] = Value.KilledPlayer.Name}))
                     end
                 end))
@@ -5590,7 +5602,7 @@ end)();
         local Chest = Object:FindFirstChild("ChestFolderValue") and Object.ChestFolderValue.Value
         if not Chest then 
             local Start: number = os.clock()
-            repeat task.wait() until (Object:FindFirstChild("ChestFolderValue") and Object:FindFirstChild("ChestFolderValue").Value) or (os.clock() - Start) > 60
+            repeat task.wait() until (Object:FindFirstChild("ChestFolderValue") and Object:FindFirstChild("ChestFolderValue").Value) or (os.clock() - Start) > 120
             Chest = Object:FindFirstChild("ChestFolderValue") and Object.ChestFolderValue.Value
             
             if not Chest then
