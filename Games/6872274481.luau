@@ -2826,9 +2826,9 @@ end)();
 end)();
 
 (function()
-    local Distance = 23
-    local Delay = 0
-    local UICheck = false
+    local Distance: number = 23
+    local Delay: number = 0
+    local UICheck: boolean = false
     local Opened = {}
 
     local ChestStealer = Windows.Utility:CreateModule({
@@ -4744,7 +4744,7 @@ end
                 Part.CanCollide = AntiVoidData.Mode ~= "Launch"
                 GameData.Utils.GameQuery:setQueryIgnored(Part)
 
-                local Pos = Night:IsAlive(LocalPlayer) and LocalPlayer.Character.HumanoidRootPart.Position.Y + 10
+                local Pos: Vector3 = (Night:IsAlive(LocalPlayer) and LocalPlayer.Character.HumanoidRootPart.Position.Y + 10) or Vector3.zero
                 task.spawn(function()
                     repeat
                         Part.Color = AntiVoidData.Color
@@ -4752,7 +4752,7 @@ end
                         Part.Material = Enum.Material[AntiVoidData.Material]
                         Part.CanCollide = AntiVoidData.Mode ~= "Launch"
 
-                        if LocalPlayer.Character.Humanoid.FloorMaterial ~= Enum.Material.Air then
+                        if Night:IsAlive(LocalPlayer) and LocalPlayer.Character.Humanoid.FloorMaterial ~= Enum.Material.Air then
                             Pos = LocalPlayer.Character.HumanoidRootPart.Position.Y
                         end
                         task.wait()
