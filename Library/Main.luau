@@ -382,12 +382,11 @@ do
     end
 
     Assets.Connections = {}
-    function Assets.Connections:Add(Connection: RBXScriptConnection | thread | () -> (), AddTo: { {any} }, value): { Connection: RBXScriptConnection, Disconnect: () -> () }
+    function Assets.Connections:Add(Connection: RBXScriptConnection | thread | () -> (), AddTo: { {any} }): { Connection: RBXScriptConnection, Disconnect: () -> () }
         AddTo = AddTo or {}
         local ConnectionData = {
             Connection = Connection :: RBXScriptConnection | thread | () -> (),
-            Disconnect = nil :: () -> ()?,
-            value = value
+            Disconnect = nil :: () -> ()?
         }
 
         if not table.find(AddTo, Night.Connections) then
@@ -669,6 +668,10 @@ do
 
             if ConfigPath and isfile("NewNight/Configs/"..ConfigPath.."/LastUsed.txt") then
                 ConfigPath = ConfigPath.."/"..readfile("NewNight/Configs/"..ConfigPath.."/LastUsed.txt")
+            end
+
+            if identifyexecutor():lower() == "volt" then
+                print("got config:"..ConfigPath)    
             end
 
             if ConfigPath then
@@ -1802,6 +1805,8 @@ local function CreateWindow(Data: {Name: string, Flag: string, Size: UDim2, Posi
             SettingsPadding.PaddingBottom = UDim.new(0, 5)
 
             function RealModuleData.Functions:SetValue(Toggled: boolean?, SaveConfig: boolean?, Notification: boolean?, Load: boolean?)
+                if setthreadidentity then setthreadidentity(8) end
+                
                 if not RealModuleData.Data.CanBeEnabled then return end
 
                 if Toggled == nil then
