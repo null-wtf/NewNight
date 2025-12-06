@@ -675,10 +675,6 @@ do
                 end
             end
 
-            if identifyexecutor():lower() == "volt" then
-                print("got config:"..ConfigPath)    
-            end
-
             if ConfigPath then
                 Assets.Config:Load(ConfigPath)
             end
