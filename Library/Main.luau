@@ -666,8 +666,13 @@ do
                 ConfigPath = tostring(Night.Game)
             end
 
-            if ConfigPath and isfile("NewNight/Configs/"..ConfigPath.."/LastUsed.txt") then
-                ConfigPath = ConfigPath.."/"..readfile("NewNight/Configs/"..ConfigPath.."/LastUsed.txt")
+            if ConfigPath then
+                if isfile("NewNight/Configs/"..ConfigPath.."/LastUsed.txt") then
+                    ConfigPath = ConfigPath.."/"..readfile("NewNight/Configs/"..ConfigPath.."/LastUsed.txt")
+                else
+                    ConfigPath = ConfigPath.."/Default"
+                    writefile("NewNight/Configs/"..ConfigPath.."/LastUsed.txt", "Default")
+                end
             end
 
             if identifyexecutor():lower() == "volt" then
