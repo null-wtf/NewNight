@@ -1,41 +1,70 @@
 local Night = getgenv().Night
 local Windows = Night.UIData
-local Assets = Night.Assets
-local OnUnject: BindableEvent = Night.OnUninject
 
-local Players: Players = Night.cloneref(game:GetService("Players"))
-local RunService: RunService = Night.cloneref(game:GetService("RunService"))
-local ReplicatedStorage: ReplicatedStorage = Night.cloneref(game:GetService("ReplicatedStorage"))
-local CollectionService: CollectionService = Night.cloneref(game:GetService("CollectionService"))
-local TweenService: TweenService = Night.cloneref(game:GetService("TweenService"))
-local UserInputService: UserInputService = Night.cloneref(game:GetService("UserInputService"))
-local HttpService: HttpService = Night.cloneref(game:GetService("HttpService"))
-local StarterGui: StarterGui = Night.cloneref(game:GetService("StarterGui"))
-local Stats: Stats = Night.cloneref(game:GetService("Stats")):FindFirstChild("PerfromanceStats")
-local TextChatService: TextChatService = Night.cloneref(game:GetService("TextChatService"))
+--// Services (CACHED)
+local Players = Night.cloneref(game:GetService("Players"))
+local Lighting = Night.cloneref(game:GetService("Lighting"))
+local Workspace = Night.cloneref(game:GetService("Workspace"))
 
-local LocalPlayer: Player = Players.LocalPlayer
-local PlayerGui: PlayerGui = Night.cloneref(LocalPlayer:WaitForChild("PlayerGui"))
-local CurrentCamera: Camera = workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = Night.cloneref(LocalPlayer:WaitForChild("PlayerGui"))
 
-local XRayTable = {
-	SliderValue = 0.7,
+--------------------------------------------------
+-- Utility
+--------------------------------------------------
+
+local function IsPartOfAnyCharacter(part: Instance): boolean
+	for _, player in ipairs(Players:GetPlayers()) do
+		local char = player.Character
+		if char and part:IsDescendantOf(char) then
+			return true
+		end
+	end
+	return false
+end
+
+--------------------------------------------------
+-- XRay
+--------------------------------------------------
+
+local XRayData = {
+	Enabled = false,
+	Value = 0.7,
+	Original = {}
 }
+
+local function ApplyXRay(part)
+	if not part:IsA("BasePart") then return end
+	if IsPartOfAnyCharacter(part) then return end
+
+	if XRayData.Original[part] == nil then
+		XRayData.Original[part] = part.Transparency
+	end
+
+	part.Transparency = XRayData.Value
+end
+
+local function RestoreXRay()
+	for part, trans in pairs(XRayData.Original) do
+		if part and part.Parent then
+			part.Transparency = trans
+		end
+	end
+	table.clear(XRayData.Original)
+end
 
 local XRay = Windows.Utility:CreateModule({
 	Name = "XRay",
-	Flag = "rbxassetid://10734975692",
-	CallingFunction = function(self, enabled: boolean)
+	Flag = "",
+	CallingFunction = function(self, enabled)
+		XRayData.Enabled = enabled
+
 		if enabled then
-			local character = LocalPlayer.Character
-			for _, v in pairs(workspace:GetDescendants()) do
-				if v:IsA("BasePart")
-					and (not character or not v:IsDescendantOf(character)) then
-					v.Transparency = XRayTable.SliderValue
-				end
+			for _, v in ipairs(Workspace:GetDescendants()) do
+				ApplyXRay(v)
 			end
 		else
-			print("disabled")
+			RestoreXRay()
 		end
 	end,
 })
@@ -45,15 +74,151 @@ XRay:Slider({
 	Flag = "",
 	Default = 0,
 	Max = 1,
-	CallingFunction = function(self, value: number)
-		XRayTable.SliderValue = value
-		local character = LocalPlayer.Character
-
-		for _, v in pairs(workspace:GetDescendants()) do
-			if v:IsA("BasePart")
-				and (not character or not v:IsDescendantOf(character)) then
-				v.Transparency = XRayTable.SliderValue
+	CallingFunction = function(self, value)
+		XRayData.Value = value
+		if not XRayData.Enabled then return end
+		for part in pairs(XRayData.Original) do
+			if part and part.Parent then
+				part.Transparency = value
 			end
 		end
 	end,
 })
+
+Workspace.DescendantAdded:Connect(function(v)
+	if XRayData.Enabled then
+		ApplyXRay(v)
+	end
+end)
+
+--------------------------------------------------
+-- Hitbox Alterator
+--------------------------------------------------
+
+local Hitbox = {
+	Enabled = false,
+	Size = Vector3.new(6,6,6),
+	Original = {}
+}
+
+local function ApplyHitbox(part)
+	if not part:IsA("BasePart") then return end
+	if not string.find(part.Name:lower(), "hitbox") then return end
+
+	if Hitbox.Original[part] == nil then
+		Hitbox.Original[part] = part.Size
+	end
+
+	part.Size = Hitbox.Size
+end
+
+local function RestoreHitboxes()
+	for part, size in pairs(Hitbox.Original) do
+		if part and part.Parent then
+			part.Size = size
+		end
+	end
+	table.clear(Hitbox.Original)
+end
+
+local HitboxAlterator = Windows.Combat:CreateModule({
+	Name = "Hitbox Alterator",
+	Flag = "",
+	CallingFunction = function(self, enabled)
+		Hitbox.Enabled = enabled
+
+		if enabled then
+			for _, v in ipairs(Workspace:GetDescendants()) do
+				ApplyHitbox(v)
+			end
+		else
+			RestoreHitboxes()
+		end
+	end,
+})
+
+HitboxAlterator:Slider({
+	Name = "Hitbox Size",
+	Flag = "",
+	Default = 6,
+	Max = 50,
+	CallingFunction = function(self, value)
+		Hitbox.Size = Vector3.new(value, value, value)
+		if not Hitbox.Enabled then return end
+		for part in pairs(Hitbox.Original) do
+			if part and part.Parent then
+				part.Size = Hitbox.Size
+			end
+		end
+	end,
+})
+
+Workspace.DescendantAdded:Connect(function(v)
+	if Hitbox.Enabled then
+		ApplyHitbox(v)
+	end
+end)
+
+--------------------------------------------------
+-- AntiParticle 
+--------------------------------------------------
+
+local AntiParticle = {
+	Enabled = false,
+	Smoke = true,
+	Flash = true
+}
+
+local function HandleParticle(v)
+	if not AntiParticle.Enabled then return end
+
+	if AntiParticle.Flash and string.find(v.Name, "Flash") then
+		pcall(function() v:Destroy() end)
+	end
+
+	if AntiParticle.Smoke and string.find(v.Name, "Smoke") then
+		pcall(function() v:Destroy() end)
+	end
+end
+
+local AntiParticleModule = Windows.Render:CreateModule({
+	Name = "AntiParticle",
+	Flag = "",
+	CallingFunction = function(self, enabled)
+		AntiParticle.Enabled = enabled
+
+		if enabled then
+			for _, v in ipairs(Lighting:GetDescendants()) do
+				HandleParticle(v)
+			end
+			for _, v in ipairs(Workspace:GetDescendants()) do
+				HandleParticle(v)
+			end
+			for _, v in ipairs(PlayerGui:GetDescendants()) do
+				HandleParticle(v)
+			end
+		end
+	end,
+})
+
+AntiParticleModule:MiniToggle({
+	Name = "Smoke",
+	Default = true,
+	Flag = "",
+	CallingFunction = function(self, value)
+		AntiParticle.Smoke = value
+	end,
+})
+
+AntiParticleModule:MiniToggle({
+	Name = "Flashbang",
+	Flag = "",
+	Default = true,
+	CallingFunction = function(self, value)
+		AntiParticle.Flash = value
+	end,
+})
+
+Lighting.DescendantAdded:Connect(HandleParticle)
+Workspace.DescendantAdded:Connect(HandleParticle)
+PlayerGui.DescendantAdded:Connect(HandleParticle)
