@@ -10,19 +10,20 @@ local LocalPlayer = Players.LocalPlayer
 local PlayerGui = Night.cloneref(LocalPlayer:WaitForChild("PlayerGui"))
 
 --------------------------------------------------
--- Load on execute
---------------------------------------------------
-Night:CreateNotification({
-	Title = "Anticheat",
-	Description = "Do not use blatant configs due to Rival's anticheat. An bypass will be dropped soon.",
-	Duration = 5
-})
-
-
-
---------------------------------------------------
 -- Utility
 --------------------------------------------------
+
+local function Warning(Title: string, Description: string, Duration: number)
+	pcall(function()
+		setthreadidentity(8)
+	end)
+
+	Night:CreateNotification({
+		Title = Title,
+		Description = Description,
+		Duration = Duration
+	})
+end
 
 local function IsPartOfAnyCharacter(part: Instance): boolean
 	for _, player in ipairs(Players:GetPlayers()) do
@@ -33,6 +34,11 @@ local function IsPartOfAnyCharacter(part: Instance): boolean
 	end
 	return false
 end
+
+--------------------------------------------------
+-- Load on execute
+--------------------------------------------------
+Warning("AntiCheat", "Rival's anticheat is currently active, don't use blatant configurations until an bypass is created!")
 
 --------------------------------------------------
 -- XRay
