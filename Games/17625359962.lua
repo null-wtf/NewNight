@@ -222,3 +222,65 @@ AntiParticleModule:MiniToggle({
 Lighting.DescendantAdded:Connect(HandleParticle)
 Workspace.DescendantAdded:Connect(HandleParticle)
 PlayerGui.DescendantAdded:Connect(HandleParticle)
+
+--------------------------------------------------
+-- Staff Detector
+--------------------------------------------------
+
+local StaffDetectorTable = {
+	Enabled = false,
+	Options = {
+		Kick = function()
+			LocalPlayer:Kick("Staff detector went off!")
+		end,
+	},
+	GroupID = 3461453,
+	SelectedRank = "Community Staff",
+	SelectedOption = "Kick"
+}
+
+local StaffDetector = Windows.Utility:CreateModule({
+	Name = "Staff Detector",
+	Flag = "",
+	CallingFunction = function(self, enabled: boolean)
+		StaffDetectorTable.Enabled = enabled
+	end,
+})
+
+StaffDetector:Dropdown({
+	Name = "Respond Option",
+	Flag = "",
+	Default = {"Kick"},
+	Options = {"Kick"},
+	MaxLimit = 1,
+	MinLimit = 1,
+	CallingFunction = function(self, value)
+		StaffDetectorTable.SelectedOption = value[1]
+	end,
+})
+
+StaffDetector:Dropdown({
+	Name = "Rank",
+	Flag = "",
+	Default = {"Community Staff"},
+	Options = {"Community Staff", "Tester", "Moderator", "Contributor", "Scripter", "Builder"},
+	MaxLimit = 1,
+	MinLimit = 1,
+	CallingFunction = function(self, value)
+		StaffDetectorTable.SelectedRank = value[1]
+	end,
+})
+
+Players.PlayerAdded:Connect(function(plr)
+	if not StaffDetectorTable.Enabled then return end
+	if not StaffDetectorTable.GroupID then return end
+
+	print("Qualified for staff detection")
+
+	if plr:GetRoleInGroup(StaffDetectorTable.GroupID) == StaffDetectorTable.SelectedRank then
+		local action = StaffDetectorTable.Options[StaffDetectorTable.SelectedOption]
+		if action then
+			action()
+		end
+	end
+end)
