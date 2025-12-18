@@ -10,6 +10,17 @@ local LocalPlayer = Players.LocalPlayer
 local PlayerGui = Night.cloneref(LocalPlayer:WaitForChild("PlayerGui"))
 
 --------------------------------------------------
+-- Load on execute
+--------------------------------------------------
+Night:CreateNotification({
+	Title = "Anticheat",
+	Description = "Do not use blatant configs due to Rival's anticheat. An bypass will be dropped soon.",
+	Duration = 5
+})
+
+
+
+--------------------------------------------------
 -- Utility
 --------------------------------------------------
 
