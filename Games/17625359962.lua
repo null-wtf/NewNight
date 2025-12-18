@@ -38,7 +38,7 @@ end
 --------------------------------------------------
 -- Load on execute
 --------------------------------------------------
-Warning("AntiCheat", "Rival's anticheat is currently active, don't use blatant configurations until an bypass is created!")
+Warning("AntiCheat", "Rival's anticheat is currently active, don't use blatant configurations until an bypass is created!", 4)
 
 --------------------------------------------------
 -- XRay
