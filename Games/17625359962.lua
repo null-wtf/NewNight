@@ -5,9 +5,14 @@ local Windows = Night.UIData
 local Players = Night.cloneref(game:GetService("Players"))
 local Lighting = Night.cloneref(game:GetService("Lighting"))
 local Workspace = Night.cloneref(game:GetService("Workspace"))
+local RunService = game:GetService("RunService")
+
+local attacking = false
 
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = Night.cloneref(LocalPlayer:WaitForChild("PlayerGui"))
+local character = LocalPlayer.Character
+local hrp = character:WaitForChild("HumanoidRootPart")
 
 --------------------------------------------------
 -- Utility
@@ -34,6 +39,40 @@ local function IsPartOfAnyCharacter(part: Instance): boolean
 	end
 	return false
 end
+
+function GetNearestPlayer()
+	local character = LocalPlayer.Character
+	if not character then return nil end
+
+	local hrp = character:FindFirstChild("HumanoidRootPart")
+	if not hrp then return nil end
+
+	local nearestPlayer = nil
+	local nearestDistance = math.huge
+	local nearestHRP = nil
+
+	for _, player in ipairs(Players:GetPlayers()) do
+		if player ~= LocalPlayer then
+			local char = player.Character
+			if char then
+				local targetHRP = char:FindFirstChild("HumanoidRootPart")
+				local humanoid = char:FindFirstChildOfClass("Humanoid")
+
+				if targetHRP and humanoid and humanoid.Health > 0 then
+					local distance = (targetHRP.Position - hrp.Position).Magnitude
+					if distance < nearestDistance then
+						nearestDistance = distance
+						nearestPlayer = player
+						nearestHRP = targetHRP
+					end
+				end
+			end
+		end
+	end
+
+	return nearestPlayer
+end
+
 
 --------------------------------------------------
 -- Load on execute
@@ -301,3 +340,244 @@ Players.PlayerAdded:Connect(function(plr)
 		end
 	end
 end)
+
+--------------------------------------------------
+-- Anticheat Bypass
+--------------------------------------------------
+local anticheatSignals = {
+	hrp.Changed,
+	hrp:GetPropertyChangedSignal("CFrame"),
+	hrp:GetPropertyChangedSignal("Position"),
+	hrp:GetPropertyChangedSignal("Velocity"),
+	hrp:GetPropertyChangedSignal("Anchored"),
+}
+
+local ACBypassTable = {
+	Enabled = false,
+	BypassMethod = "",
+}
+
+-- STORAGE
+local DisabledConnections = {}
+local HookedFunctions = {}
+
+local anticheatSignals = {
+	hrp.Changed,
+	hrp:GetPropertyChangedSignal("CFrame"),
+	hrp:GetPropertyChangedSignal("Position"),
+	hrp:GetPropertyChangedSignal("Velocity"),
+	hrp:GetPropertyChangedSignal("Anchored"),
+}
+
+function anticooker(state, bypassvers)
+	-- ENABLE
+	if state == true then
+		if ACBypassTable.Enabled then return end
+		ACBypassTable.Enabled = true
+		ACBypassTable.BypassMethod = bypassvers
+
+		-- =====================
+		-- UNIVERSAL METHOD
+		-- =====================
+		if bypassvers == "Universal" then
+			for _, signal in ipairs(anticheatSignals) do
+				for _, connection in ipairs(getconnections(signal)) do
+					if connection.Enabled then
+						connection:Disable()
+						table.insert(DisabledConnections, connection)
+					end
+				end
+			end
+
+			print("HumanoidRootPart change signals disabled.")
+
+			-- =====================
+			-- OLD BYPASS METHOD
+			-- =====================
+		elseif bypassvers == "old bypass" then
+			local function hookSignal(signalName)
+				for _, v in ipairs(getconnections(hrp:GetPropertyChangedSignal(signalName))) do
+					if v.Function then
+						local oldFunc
+						oldFunc = hookfunction(v.Function, function(...)
+							print("Disabler took actions! (" .. signalName .. " signal)")
+							return
+						end)
+
+						table.insert(HookedFunctions, {
+							Connection = v,
+							Original = oldFunc
+						})
+					end
+				end
+			end
+
+			hookSignal("CFrame")
+			hookSignal("Velocity")
+		end
+
+		-- DISABLE / REVERSE
+	elseif state == false then
+		if not ACBypassTable.Enabled then return end
+
+		-- Re-enable disabled connections
+		for _, connection in ipairs(DisabledConnections) do
+			if connection.Enable then
+				connection:Enable()
+			end
+		end
+		table.clear(DisabledConnections)
+
+		-- Restore hooked functions
+		for _, hookData in ipairs(HookedFunctions) do
+			if hookData.Connection and hookData.Original then
+				hookfunction(hookData.Connection.Function, hookData.Original)
+			end
+		end
+		table.clear(HookedFunctions)
+
+		ACBypassTable.Enabled = false
+		ACBypassTable.BypassMethod = ""
+
+		print("HumanoidRootPart change signals restored.")
+	end
+end
+
+
+local ACBypass = Windows.Utility:CreateModule({
+	Name = "Anticheat Bypass",
+	Flag = "",
+	CallingFunction = function(self, enabled: boolean)
+		ACBypassTable.Enabled = enabled
+		if enabled then
+			anticooker(true, ACBypassTable.BypassMethod)
+		else
+			anticooker(false)
+		end
+	end,
+})
+
+ACBypass:Dropdown({
+	Name = "Method",
+	Flag = "",
+	Default = {"Universal"},
+	Options = {"Universal", "Old-Bypass"},
+	MaxLimit = 1,
+	MinLimit = 1,
+	CallingFunction = function(self, value)
+		ACBypassTable.BypassMethod = value
+	end,
+})
+
+--------------------------------------------------
+-- Auto Win
+--------------------------------------------------
+
+local auto_win_table = {
+	Enabled = false
+}
+
+local lastClick = 0
+local clickDelay = 0.15
+
+RunService.Heartbeat:Connect(function()
+	if auto_win_table.Enabled then
+		local player = GetNearestPlayer()
+		if player then
+			local character = player.Character
+			if character then
+				local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+				local humanoid = character:FindFirstChildOfClass("Humanoid")
+
+				if humanoidRootPart and humanoid and humanoid.Health > 0 then
+					hrp.CFrame = humanoidRootPart.CFrame * CFrame.new(0, 0, -2)
+
+					if tick() - lastClick >= clickDelay then
+						mouse1click()
+						lastClick = tick()
+					end
+				end
+			end
+		end
+	end
+end)
+
+
+local autowin = Windows.Combat:CreateModule({
+	Name = "Auto Win",
+	Flag = "",
+	CallingFunction = function(self, enabled: boolean)
+		auto_win_table.Enabled = enabled
+	end,
+})
+
+--------------------------------------------------
+-- ESP
+--------------------------------------------------
+
+Windows.Render.Modules.UniversalESP:Destroy()
+
+local Players = game:GetService("Players")
+
+local ESPTable = {
+	enabled = false
+}
+
+local function addESP(character)
+	if not character:FindFirstChild("NightESP") then
+		local highlight = Instance.new("Highlight")
+		highlight.Name = "NightESP"
+		highlight.Parent = character
+	end
+end
+
+local function removeESP(character)
+	local esp = character:FindFirstChild("NightESP")
+	if esp then
+		esp:Destroy()
+	end
+end
+
+local function ESPUpdate()
+	for _, player in ipairs(Players:GetPlayers()) do
+		local character = player.Character
+		if character then
+			if ESPTable.enabled then
+				addESP(character)
+			else
+				removeESP(character)
+			end
+		end
+	end
+end
+
+local function hookPlayer(player)
+	player.CharacterAdded:Connect(function(character)
+		if ESPTable.enabled then
+			addESP(character)
+		end
+	end)
+
+	player.CharacterRemoving:Connect(function(character)
+		removeESP(character)
+	end)
+
+	if player.Character and ESPTable.enabled then
+		addESP(player.Character)
+	end
+end
+
+for _, player in ipairs(Players:GetPlayers()) do
+	hookPlayer(player)
+end
+
+Players.PlayerAdded:Connect(hookPlayer)
+
+local ESP = Windows.Render:CreateModule({
+	Name = "ESP",
+	Flag = "",
+	CallingFunction = function(self, enabled: boolean)
+		ESPTable.enabled = enabled
+		ESPUpdate()
+	end,
+})
