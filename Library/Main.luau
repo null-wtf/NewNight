@@ -3449,7 +3449,7 @@ function Assets.Functions:CreateTargetHud(Data: {Player: Player?, UserData: {Nam
     ActualPFPIcon.BackgroundTransparency = 1
     ActualPFPIcon.Position = UDim2.fromScale(0, -0.062)
     ActualPFPIcon.Size = UDim2.fromOffset(65, 65)
-    ActualPFPIcon.Image = TargetHudData.Data.UserData.ProfilePic
+    ActualPFPIcon.Image = TargetHudData.Data.UserData.ProfilePic or ""
     ActualPFPIcon.ImageColor3 = Color3.fromRGB(255, 255, 255)
     ActualPFPIcon.ZIndex = 2
     Instance.new("UICorner", ActualPFPIcon).CornerRadius = UDim.new(0, 8)
