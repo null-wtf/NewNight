@@ -30,10 +30,10 @@ local HttpService: HttpService = Night.cloneref(game:GetService("HttpService"))
 local UserInputService: UserInputService = Night.cloneref(game:GetService("UserInputService"))
 local TweenService: TweenService = Night.cloneref(game:GetService("TweenService"))
 local VirtualInputManager: VirtualInputManager = Night.cloneref(game:GetService("VirtualInputManager"))
-local Terrain: Terrain = workspace:FindFirstChildOfClass("Terrain")
 
 local LocalPlayer = Players.LocalPlayer :: Player
 local CurrentCamera: Camera = workspace.CurrentCamera
+local Terrain: Terrain = workspace:FindFirstChildOfClass("Terrain")
 local MainRequest = http and http.request or request
 
 local Materials = {}
@@ -41,10 +41,7 @@ for _, Material in next, Enum.Material:GetEnumItems() do
     table.insert(Materials, Material.Name)
 end
 
-pcall(function()
-	setthreadidentity(8)
-end);
-
+pcall(setthreadidentity, 8);
 (function()
     local SpeedData = {
         Settings = {
@@ -276,7 +273,7 @@ end)();
             if enabled then
                 self:Connection(RunService.PreAnimation:Connect(function(Delta: number)
                     if Night:IsAlive(LocalPlayer) then
-                        local Root: BasePart = LocalPlayer.Character.PrimaryPart
+                        local Root: BasePart = LocalPlayer.Character.PrimaryPart or LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
                         local Humanoid: Humanoid = LocalPlayer.Character.Humanoid
 
                         local IndexVal: number = 1
@@ -590,7 +587,7 @@ end)();
 
                     if NearestToMouse.Player and NearestToMouse.Character then
                         local Target = NearestToMouse.Character
-                        local TargetPart = Target:FindFirstChild(AimbotData.Settings.TargetPart) or Target.PrimaryPart
+                        local TargetPart = Target:FindFirstChild(AimbotData.Settings.TargetPart) or (Target.PrimaryPart or Target:FindFirstChild("HumanoidRootPart"))
                         if TargetPart then
                             local Pos, OnScreen = CurrentCamera:WorldToViewportPoint(TargetPart.Position)
                             local MousePos = UserInputService:GetMouseLocation()
@@ -813,6 +810,23 @@ end)();
         }
     }
 
+    local DrawPairs = {
+        {"Head", "UpperTorso", "Head", "Torso", nil, CFrame.new(0, -0.2, 0)},
+        {"UpperTorso", "LowerTorso", "Torso", "Torso", CFrame.new(0, 0.5, 0), CFrame.new(0, -0.5, 0)},
+        {"UpperTorso", "LeftUpperArm", "Torso", "Left Arm", CFrame.new(0, 0.5, 0), CFrame.new(0, 0.5, 0)},
+        {"LeftUpperArm", "LeftLowerArm", "Left Arm", "Left Arm", CFrame.new(0, 0.5, 0), CFrame.new(0, -0.5, 0)},
+        {"LeftLowerArm", "LeftHand", "Left Arm", "Left Arm", nil, nil},
+        {"UpperTorso", "RightUpperArm", "Torso", "Right Arm", CFrame.new(0, 0.5, 0), CFrame.new(0, 0.5, 0)},
+        {"RightUpperArm", "RightLowerArm", "Right Arm", "Right Arm", CFrame.new(0, 0.5, 0), CFrame.new(0, -0.5, 0)},
+        {"RightLowerArm", "RightHand", "Right Arm", "Right Arm", nil, nil},
+        {"LowerTorso", "LeftUpperLeg", "Torso", "Left Leg", CFrame.new(0, -0.5, 0), CFrame.new(0, 0.5, 0)},
+        {"LowerTorso", "RightUpperLeg", "Torso", "Right Leg", CFrame.new(0, -0.5, 0), CFrame.new(0, 0.5, 0)},
+        {"LeftUpperLeg", "LeftLowerLeg", "Left Leg", "Left Leg", CFrame.new(0, 0.5, 0), CFrame.new(0, -0.5, 0)},
+        {"RightUpperLeg", "RightLowerLeg", "Right Leg", "Right Leg", CFrame.new(0, 0.5, 0), CFrame.new(0, -0.5, 0)},
+        {"LeftLowerLeg", "LeftFoot", "Left Leg", "Left Leg", nil, nil},
+        {"RightLowerLeg", "RightFoot", "Right Leg", "Right Leg", nil, nil}
+    }
+
     local function CreateESP(Target: Player)
         local BoxOutline = Drawing.new("Quad")
         BoxOutline.Visible = false
@@ -854,23 +868,6 @@ end)();
 
             return Line
         end
-
-        local DrawPairs = {
-            {"Head", "UpperTorso", "Head", "Torso", nil, CFrame.new(0, -0.2, 0)},
-            {"UpperTorso", "LowerTorso", "Torso", "Torso", CFrame.new(0, 0.5, 0), CFrame.new(0, -0.5, 0)},
-            {"UpperTorso", "LeftUpperArm", "Torso", "Left Arm", CFrame.new(0, 0.5, 0), CFrame.new(0, 0.5, 0)},
-            {"LeftUpperArm", "LeftLowerArm", "Left Arm", "Left Arm", CFrame.new(0, 0.5, 0), CFrame.new(0, -0.5, 0)},
-            {"LeftLowerArm", "LeftHand", "Left Arm", "Left Arm", nil, nil},
-            {"UpperTorso", "RightUpperArm", "Torso", "Right Arm", CFrame.new(0, 0.5, 0), CFrame.new(0, 0.5, 0)},
-            {"RightUpperArm", "RightLowerArm", "Right Arm", "Right Arm", CFrame.new(0, 0.5, 0), CFrame.new(0, -0.5, 0)},
-            {"RightLowerArm", "RightHand", "Right Arm", "Right Arm", nil, nil},
-            {"LowerTorso", "LeftUpperLeg", "Torso", "Left Leg", CFrame.new(0, -0.5, 0), CFrame.new(0, 0.5, 0)},
-            {"LowerTorso", "RightUpperLeg", "Torso", "Right Leg", CFrame.new(0, -0.5, 0), CFrame.new(0, 0.5, 0)},
-            {"LeftUpperLeg", "LeftLowerLeg", "Left Leg", "Left Leg", CFrame.new(0, 0.5, 0), CFrame.new(0, -0.5, 0)},
-            {"RightUpperLeg", "RightLowerLeg", "Right Leg", "Right Leg", CFrame.new(0, 0.5, 0), CFrame.new(0, -0.5, 0)},
-            {"LeftLowerLeg", "LeftFoot", "Left Leg", "Left Leg", nil, nil},
-            {"RightLowerLeg", "RightFoot", "Right Leg", "Right Leg", nil, nil}
-        }
 
         for _ = 1, #DrawPairs do
             CreateBone()
@@ -922,305 +919,92 @@ end)();
             end
 
             if Night:IsAlive(Target) then
-                local Humanoid = Target.Character:FindFirstChildOfClass("Humanoid")
-                local Root = Target.Character.PrimaryPart
-                if Humanoid and Humanoid.Health > 0 then
-                    if ESPData.Settings.TeamCheck and Target.Team and LocalPlayer.Team and Target.Team == LocalPlayer.Team then
-                        BoxOutline.Visible = false
-                        BoxFill.Visible = false
-                        HealthBar.Visible = false
-                        HealthBarOutline.Visible = false
-                        NameTag.Visible = false
-                        for _, L in next, SkeletonLines do 
-                            L.Visible = false 
-                        end
-
-                        return
+                local Humanoid: Humanoid = Target.Character:FindFirstChildOfClass("Humanoid")
+                local Root: BasePart = Target.Character.PrimaryPart or Target.Character:FindFirstChild("HumanoidRootPart")
+                local _, OnScreen = CurrentCamera:WorldToViewportPoint(Root.Position)
+                if ESPData.Settings.TeamCheck and Target.Team and LocalPlayer.Team and Target.Team == LocalPlayer.Team or not OnScreen then
+                    BoxOutline.Visible = false
+                    BoxFill.Visible = false
+                    HealthBar.Visible = false
+                    HealthBarOutline.Visible = false
+                    NameTag.Visible = false
+                    for _, L in next, SkeletonLines do 
+                        L.Visible = false 
                     end
 
-                    local _, OnScreen = CurrentCamera:WorldToViewportPoint(Root.Position)
-                    if OnScreen then
-                        if ESPData.Settings.ESPMode == "Dynamic" then
-                            local Coords = {}
-                            for _, Part in next, Target.Character:GetChildren() do
-                                if Part:IsA("BasePart") then
-                                    local Adjusted = Part.CFrame
-                                    if Part.Name == "Head" then
-                                        Adjusted = Part.CFrame * CFrame.new(0, Part.Size.Y / 2, 0)
-                                    elseif Part == Root then
-                                        Adjusted = Part.CFrame * CFrame.new(0, 0, -Part.Size.Z)
-                                    elseif string.find(tostring(Part.Name), "Left") then
-                                        Adjusted = Part.CFrame * CFrame.new(-Part.Size.X / 2, 0, 0)
-                                    elseif string.find(tostring(Part.Name), "Right") then
-                                        Adjusted = Part.CFrame * CFrame.new(Part.Size.X / 2, 0, 0)
-                                    end
-                                    local Screen, Visible = CurrentCamera:WorldToViewportPoint(Adjusted.Position)
-                                    if Visible then
-                                        table.insert(Coords, Screen)
-                                    end
+                    return
+                end
+
+                if OnScreen then
+                    if ESPData.Settings.ESPMode == "Dynamic" then
+                        local Coords = {}
+                        for _, Part in next, Target.Character:GetChildren() do
+                            if Part:IsA("BasePart") then
+                                local Adjusted = Part.CFrame
+                                if Part.Name == "Head" then
+                                    Adjusted = Part.CFrame * CFrame.new(0, Part.Size.Y / 2, 0)
+                                elseif Part == Root then
+                                    Adjusted = Part.CFrame * CFrame.new(0, 0, -Part.Size.Z)
+                                elseif string.find(tostring(Part.Name), "Left") then
+                                    Adjusted = Part.CFrame * CFrame.new(-Part.Size.X / 2, 0, 0)
+                                elseif string.find(tostring(Part.Name), "Right") then
+                                    Adjusted = Part.CFrame * CFrame.new(Part.Size.X / 2, 0, 0)
+                                end
+                                local Screen, Visible = CurrentCamera:WorldToViewportPoint(Adjusted.Position)
+                                if Visible then
+                                    table.insert(Coords, Screen)
                                 end
                             end
+                        end
 
-                            if #Coords > 0 then
-                                local MinX, MaxX, MinY, MaxY = math.huge, -math.huge, math.huge, -math.huge
-                                for _, Pos in next, Coords do
-                                    if Pos.X < MinX then MinX = Pos.X end
-                                    if Pos.X > MaxX then MaxX = Pos.X end
-                                    if Pos.Y < MinY then MinY = Pos.Y end
-                                    if Pos.Y > MaxY then MaxY = Pos.Y end
-                                end
+                        if #Coords > 0 then
+                            local MinX, MaxX, MinY, MaxY = math.huge, -math.huge, math.huge, -math.huge
+                            for _, Pos in next, Coords do
+                                if Pos.X < MinX then MinX = Pos.X end
+                                if Pos.X > MaxX then MaxX = Pos.X end
+                                if Pos.Y < MinY then MinY = Pos.Y end
+                                if Pos.Y > MaxY then MaxY = Pos.Y end
+                            end
 
-                                local BoxColor = (ESPData.Settings.TeamColor and Target.Team) and Target.TeamColor.Color or ESPData.Settings.Color
-                                if ESPData.Settings.BoxMode == "Box" then
-                                    BoxOutline.PointA = Vector2.new(MaxX + 5, MinY - 10)
-                                    BoxOutline.PointB = Vector2.new(MinX - 5, MinY - 10)
-                                    BoxOutline.PointC = Vector2.new(MinX - 5, MaxY + 10)
-                                    BoxOutline.PointD = Vector2.new(MaxX + 5, MaxY + 10)
-                                    BoxOutline.Visible = ESPData.Settings.Boxes
-                                    BoxOutline.Color = BoxColor
+                            local BoxColor = (ESPData.Settings.TeamColor and Target.Team) and Target.TeamColor.Color or ESPData.Settings.Color
+                            if ESPData.Settings.BoxMode == "Box" then
+                                BoxOutline.PointA = Vector2.new(MaxX + 5, MinY - 10)
+                                BoxOutline.PointB = Vector2.new(MinX - 5, MinY - 10)
+                                BoxOutline.PointC = Vector2.new(MinX - 5, MaxY + 10)
+                                BoxOutline.PointD = Vector2.new(MaxX + 5, MaxY + 10)
+                                BoxOutline.Visible = ESPData.Settings.Boxes
+                                BoxOutline.Color = BoxColor
 
-                                    BoxFill.PointA = Vector2.new(MaxX + 5 - 1, MinY - 10 + 1)
-                                    BoxFill.PointB = Vector2.new(MinX - 5 + 1, MinY - 10 + 1)
-                                    BoxFill.PointC = Vector2.new(MinX - 5 + 1, MaxY + 10 - 1)
-                                    BoxFill.PointD = Vector2.new(MaxX + 5 - 1, MaxY + 10 - 1)
-                                    BoxFill.Visible = ESPData.Settings.FillBoxes
-                                    BoxFill.Color = ESPData.Settings.FillColor
+                                BoxFill.PointA = Vector2.new(MaxX + 5 - 1, MinY - 10 + 1)
+                                BoxFill.PointB = Vector2.new(MinX - 5 + 1, MinY - 10 + 1)
+                                BoxFill.PointC = Vector2.new(MinX - 5 + 1, MaxY + 10 - 1)
+                                BoxFill.PointD = Vector2.new(MaxX + 5 - 1, MaxY + 10 - 1)
+                                BoxFill.Visible = ESPData.Settings.FillBoxes
+                                BoxFill.Color = ESPData.Settings.FillColor
 
-                                    for _, L in next, SkeletonLines do L.Visible = false end
-                                elseif ESPData.Settings.BoxMode == "Cornered" then
-                                    DrawCorneredBox(Vector2.new(MinX - 5, MaxY + 10), Vector2.new(MaxX + 5, MaxY + 10), Vector2.new(MinX - 5, MinY - 10), Vector2.new(MaxX + 5, MinY - 10), BoxColor)
-                                    BoxOutline.Visible = false
-                                    BoxFill.Visible = false
-                                end
-
-                                if ESPData.Settings.Health then
-                                    HealthBarOutline.From = Vector2.new(MinX - 9, MinY - 10)
-                                    HealthBarOutline.To = Vector2.new(MinX - 9, MaxY + 10)
-                                    HealthBarOutline.Visible = true
-                                    local HealthPercent = math.clamp(Humanoid.Health / Humanoid.MaxHealth, 0, 1)
-                                    HealthBar.From = Vector2.new(MinX - 9, MaxY + 10)
-                                    HealthBar.To = Vector2.new(MinX - 9, MaxY + 10 - (MaxY + 10 - (MinY - 10)) * HealthPercent)
-                                    HealthBar.Color = Color3.fromRGB(255 - (255 * HealthPercent), 255 * HealthPercent, 0)
-                                    HealthBar.Visible = true
-                                else
-                                    HealthBar.Visible = false
-                                    HealthBarOutline.Visible = false
-                                end
-
-                                if ESPData.Settings.Name then
-                                    local namePos = Vector2.new((MinX + MaxX) / 2, MinY - 30)
-                                    NameTag.Position = namePos
-                                    NameTag.Text = Target.Name
-                                    NameTag.Visible = true
-                                    NameTag.Color = (ESPData.Settings.TeamColor and Target.Team) and Target.TeamColor.Color or ESPData.Settings.Color
-                                else
-                                    NameTag.Visible = false
-                                end
-                            else
+                                for _, L in next, SkeletonLines do L.Visible = false end
+                            elseif ESPData.Settings.BoxMode == "Cornered" then
+                                DrawCorneredBox(Vector2.new(MinX - 5, MaxY + 10), Vector2.new(MaxX + 5, MaxY + 10), Vector2.new(MinX - 5, MinY - 10), Vector2.new(MaxX + 5, MinY - 10), BoxColor)
                                 BoxOutline.Visible = false
                                 BoxFill.Visible = false
-                                HealthBar.Visible = false
-                                HealthBarOutline.Visible = false
-                                NameTag.Visible = false
-                                for _, L in next, SkeletonLines do L.Visible = false end
                             end
-                        elseif ESPData.Settings.ESPMode == "Classic" then
-                            local hrpPos = Root.Position - Vector3.new(0, 0.2, 0)
-                            local boxSize = Vector3.new(4, 7.5, 0)
 
-                            local topRight2D, trVisible = CurrentCamera:WorldToViewportPoint(hrpPos + (CurrentCamera.CFrame.RightVector * (boxSize.X / 2)) + (-CurrentCamera.CFrame.UpVector * (boxSize.Y / 2)))
-                            local topLeft2D, tlVisible = CurrentCamera:WorldToViewportPoint(hrpPos + (CurrentCamera.CFrame.RightVector * -(boxSize.X / 2)) + (-CurrentCamera.CFrame.UpVector * (boxSize.Y / 2)))
-                            local bottomRight2D, brVisible = CurrentCamera:WorldToViewportPoint(hrpPos + (CurrentCamera.CFrame.RightVector * (boxSize.X / 2)) + (-CurrentCamera.CFrame.UpVector * -(boxSize.Y / 2)))
-                            local bottomLeft2D, blVisible = CurrentCamera:WorldToViewportPoint(hrpPos + (CurrentCamera.CFrame.RightVector * -(boxSize.X / 2)) + (-CurrentCamera.CFrame.UpVector * -(boxSize.Y / 2)))
-
-                            local isVisible = trVisible or tlVisible or brVisible or blVisible
-                            if isVisible then
-                                local tl2D = Vector2.new(topLeft2D.X, topLeft2D.Y)
-                                local tr2D = Vector2.new(topRight2D.X, topRight2D.Y)
-                                local bl2D = Vector2.new(bottomLeft2D.X, bottomLeft2D.Y)
-                                local br2D = Vector2.new(bottomRight2D.X, bottomRight2D.Y)
-                                local boxColor = (ESPData.Settings.TeamColor and Target.Team) and Target.TeamColor.Color or ESPData.Settings.Color
-
-                                if ESPData.Settings.Boxes then
-                                    if ESPData.Settings.BoxMode == "Box" then
-                                        BoxOutline.PointA = tr2D
-                                        BoxOutline.PointB = tl2D
-                                        BoxOutline.PointC = bl2D
-                                        BoxOutline.PointD = br2D
-                                        BoxOutline.Visible = ESPData.Settings.Boxes
-                                        BoxOutline.Color = boxColor
-
-                                        BoxFill.PointA = Vector2.new(tr2D.X - 1, tr2D.Y + 1)
-                                        BoxFill.PointB = Vector2.new(tl2D.X + 1, tl2D.Y + 1)
-                                        BoxFill.PointC = Vector2.new(bl2D.X + 1, bl2D.Y - 1)
-                                        BoxFill.PointD = Vector2.new(br2D.X - 1, br2D.Y - 1)
-                                        BoxFill.Visible = ESPData.Settings.FillBoxes
-                                        BoxFill.Color = ESPData.Settings.FillColor
-
-                                        for _, L in next, SkeletonLines do L.Visible = false end
-                                    elseif ESPData.Settings.BoxMode == "Cornered" then
-                                        DrawCorneredBox(tl2D, tr2D, bl2D, br2D, boxColor)
-                                        BoxOutline.Visible = false
-                                        BoxFill.Visible = false
-                                    end
-                                else
-                                    BoxOutline.Visible = false
-                                    for _, L in next, SkeletonLines do L.Visible = false end
-                                end
-
-                                if ESPData.Settings.Health then
-                                    HealthBarOutline.From = Vector2.new(topLeft2D.X - 4, topLeft2D.Y)
-                                    HealthBarOutline.To = Vector2.new(topLeft2D.X - 4, bottomLeft2D.Y)
-                                    HealthBarOutline.Visible = true
-                                    
-                                    local HealthPercent = math.clamp(Humanoid.Health / Humanoid.MaxHealth, 0, 1)
-                                    HealthBar.From = Vector2.new(topLeft2D.X - 4, topLeft2D.Y)
-                                    HealthBar.To = Vector2.new(topLeft2D.X - 4, topLeft2D.Y + (bottomLeft2D.Y - topLeft2D.Y) * HealthPercent)
-                                    HealthBar.Color = Color3.fromRGB(255 - (255 * HealthPercent), 255 * HealthPercent, 0)
-                                    HealthBar.Visible = true
-                                else
-                                    HealthBar.Visible = false
-                                    HealthBarOutline.Visible = false
-                                end
-                                if ESPData.Settings.Name then
-                                    local namePos = Vector2.new((topLeft2D.X + topRight2D.X) / 2, math.min(topLeft2D.Y, bottomLeft2D.Y, topRight2D.Y, bottomRight2D.Y) - 30)
-                                    NameTag.Position = namePos
-                                    NameTag.Text = Target.Name
-                                    NameTag.Visible = true
-                                    NameTag.Color = (ESPData.Settings.TeamColor and Target.Team) and Target.TeamColor.Color or ESPData.Settings.Color
-                                else
-                                    NameTag.Visible = false
-                                end
+                            if ESPData.Settings.Health then
+                                HealthBarOutline.From = Vector2.new(MinX - 9, MinY - 10)
+                                HealthBarOutline.To = Vector2.new(MinX - 9, MaxY + 10)
+                                HealthBarOutline.Visible = true
+                                local HealthPercent = math.clamp(Humanoid.Health / Humanoid.MaxHealth, 0, 1)
+                                HealthBar.From = Vector2.new(MinX - 9, MaxY + 10)
+                                HealthBar.To = Vector2.new(MinX - 9, MaxY + 10 - (MaxY + 10 - (MinY - 10)) * HealthPercent)
+                                HealthBar.Color = Color3.fromRGB(255 - (255 * HealthPercent), 255 * HealthPercent, 0)
+                                HealthBar.Visible = true
                             else
-                                BoxOutline.Visible = false
-                                BoxFill.Visible = false
                                 HealthBar.Visible = false
                                 HealthBarOutline.Visible = false
-                                NameTag.Visible = false
-                                for _, L in next, SkeletonLines do L.Visible = false end
-                            end
-                        elseif ESPData.Settings.ESPMode == "Locked" then
-                            local hrpPos = Root.Position - Vector3.new(0, 0.2, 0)
-                            local boxSize = Vector3.new(4.5, 6.5, 0)
-
-                            local topRight2D, trVisible = CurrentCamera:WorldToViewportPoint(hrpPos + (Root.CFrame.RightVector * boxSize.X / 2) + (Root.CFrame.UpVector * boxSize.Y / 2))
-                            local topLeft2D, tlVisible = CurrentCamera:WorldToViewportPoint(hrpPos + (Root.CFrame.RightVector * -(boxSize.X / 2)) + (Root.CFrame.UpVector * boxSize.Y / 2))
-                            local bottomRight2D, brVisible = CurrentCamera:WorldToViewportPoint(hrpPos + (Root.CFrame.RightVector * boxSize.X / 2) + (Root.CFrame.UpVector * -(boxSize.Y / 2)))
-                            local bottomLeft2D, blVisible = CurrentCamera:WorldToViewportPoint(hrpPos + (Root.CFrame.RightVector * -(boxSize.X / 2)) + (Root.CFrame.UpVector * -(boxSize.Y / 2)))
-
-                            local isVisible = trVisible or tlVisible or brVisible or blVisible
-                            if isVisible then
-                                local tl2D = Vector2.new(topLeft2D.X, topLeft2D.Y)
-                                local tr2D = Vector2.new(topRight2D.X, topRight2D.Y)
-                                local bl2D = Vector2.new(bottomLeft2D.X, bottomLeft2D.Y)
-                                local br2D = Vector2.new(bottomRight2D.X, bottomRight2D.Y)
-                                local BoxColor = (ESPData.Settings.TeamColor and Target.Team) and Target.TeamColor.Color or ESPData.Settings.Color
-
-                                if ESPData.Settings.Boxes then
-                                    if ESPData.Settings.BoxMode == "Box" then
-                                        BoxOutline.PointA = tr2D
-                                        BoxOutline.PointB = tl2D
-                                        BoxOutline.PointC = bl2D
-                                        BoxOutline.PointD = br2D
-                                        BoxOutline.Visible = ESPData.Settings.Boxes
-                                        BoxOutline.Color = BoxColor
-
-                                        BoxFill.PointA = Vector2.new(tr2D.X - 1, tr2D.Y + 1)
-                                        BoxFill.PointB = Vector2.new(tl2D.X + 1, tl2D.Y + 1)
-                                        BoxFill.PointC = Vector2.new(bl2D.X + 1, bl2D.Y - 1)
-                                        BoxFill.PointD = Vector2.new(br2D.X - 1, br2D.Y - 1)
-                                        BoxFill.Visible = ESPData.Settings.FillBoxes
-                                        BoxFill.Color = ESPData.Settings.FillColor
-
-                                        for _, L in next, SkeletonLines do L.Visible = false end
-                                    elseif ESPData.Settings.BoxMode == "Cornered" then
-                                        local Flip = (tl2D.X > tr2D.X) or (bl2D.X > br2D.X)
-                                        if Flip then
-                                            DrawCorneredBox(br2D, bl2D, tr2D, tl2D, BoxColor)
-                                        else
-                                            DrawCorneredBox(bl2D, br2D, tl2D, tr2D, BoxColor)
-                                        end
-                                        BoxOutline.Visible = false
-                                        BoxFill.Visible = false
-                                    end
-                                else
-                                    BoxOutline.Visible = false
-                                    for _, L in next, SkeletonLines do L.Visible = false end
-                                end
-
-                                if ESPData.Settings.Name then
-                                    local namePos = Vector2.new((topLeft2D.X + topRight2D.X) / 2, math.min(topLeft2D.Y, bottomLeft2D.Y, topRight2D.Y, bottomRight2D.Y) - 30)
-                                    NameTag.Position = namePos
-                                    NameTag.Text = Target.Name
-                                    NameTag.Visible = true
-                                    NameTag.Color = (ESPData.Settings.TeamColor and Target.Team) and Target.TeamColor.Color or ESPData.Settings.Color
-                                else
-                                    NameTag.Visible = false
-                                end
-                            else
-                                BoxOutline.Visible = false
-                                BoxFill.Visible = false
-                                HealthBar.Visible = false
-                                HealthBarOutline.Visible = false
-                                NameTag.Visible = false
-                                for _, L in next, SkeletonLines do L.Visible = false end
-                            end
-                        elseif ESPData.Settings.ESPMode == "Skeleton" then
-                            local screenCoords = {}
-                            local isVisible = false
-                            local isR6 = Humanoid.RigType == Enum.HumanoidRigType.R6
-                            for i, pair in next, DrawPairs do
-                                local Line = SkeletonLines[i]
-                                local Part1, Part2
-                                if isR6 then
-                                    Part1 = Target.Character:FindFirstChild(pair[3])
-                                    Part2 = Target.Character:FindFirstChild(pair[4])
-                                else
-                                    Part1 = Target.Character:FindFirstChild(pair[1])
-                                    Part2 = Target.Character:FindFirstChild(pair[2])
-                                end
-                                if Part1 and Part2 then
-                                    local pos1 = Part1.Position
-                                    local pos2 = Part2.Position
-
-                                    if isR6 and pair[5] then
-                                        pos1 = (Part1.CFrame * pair[5]).p
-                                    elseif not isR6 and pair[1] == "Head" then
-                                        pos1 = (Part1.CFrame * CFrame.new(0, -0.2, 0)).p
-                                    end
-
-                                    if isR6 and pair[6] then
-                                        pos2 = (Part2.CFrame * pair[6]).p
-                                    elseif not isR6 and pair[2] == "UpperTorso" and pair[1] ~= "Head" then
-                                        pos2 = (Part2.CFrame * CFrame.new(0, 0.5, 0)).p
-                                    elseif not isR6 and pair[2] == "LowerTorso" then
-                                        pos2 = Part2.Position
-                                    end
-
-                                    local P1, Vis1 = CurrentCamera:WorldToViewportPoint(pos1)
-                                    local P2, Vis2 = CurrentCamera:WorldToViewportPoint(pos2)
-                                    screenCoords[pair[1]] = screenCoords[pair[1]] or { Pos = P1, Visible = Vis1 }
-                                    screenCoords[pair[2]] = screenCoords[pair[2]] or { Pos = P2, Visible = Vis2 }
-
-                                    if Vis1 and Vis2 then
-                                        Line.From = Vector2.new(P1.X, P1.Y)
-                                        Line.To = Vector2.new(P2.X, P2.Y)
-                                        Line.Color = (ESPData.Settings.TeamColor and Target.Team) and Target.TeamColor.Color or ESPData.Settings.Color
-                                        Line.Visible = true
-                                        isVisible = true
-                                    else
-                                        Line.Visible = false
-                                    end
-                                else
-                                    Line.Visible = false
-                                end
                             end
 
-                            HealthBar.Visible = false
-                            HealthBarOutline.Visible = false
-
-                            if ESPData.Settings.Name and screenCoords.Head and screenCoords.Head.Visible then
-                                local namePos = Vector2.new(screenCoords.Head.Pos.X, screenCoords.Head.Pos.Y - 30)
+                            if ESPData.Settings.Name then
+                                local namePos = Vector2.new((MinX + MaxX) / 2, MinY - 30)
                                 NameTag.Position = namePos
                                 NameTag.Text = Target.Name
                                 NameTag.Visible = true
@@ -1228,84 +1012,279 @@ end)();
                             else
                                 NameTag.Visible = false
                             end
-
+                        else
                             BoxOutline.Visible = false
                             BoxFill.Visible = false
-                            if not isVisible then
-                                NameTag.Visible = false
+                            HealthBar.Visible = false
+                            HealthBarOutline.Visible = false
+                            NameTag.Visible = false
+                            for _, L in next, SkeletonLines do L.Visible = false end
+                        end
+                    elseif ESPData.Settings.ESPMode == "Classic" then
+                        local hrpPos = Root.Position - Vector3.new(0, 0.2, 0)
+                        local boxSize = Vector3.new(4, 7.5, 0)
+
+                        local topRight2D, trVisible = CurrentCamera:WorldToViewportPoint(hrpPos + (CurrentCamera.CFrame.RightVector * (boxSize.X / 2)) + (-CurrentCamera.CFrame.UpVector * (boxSize.Y / 2)))
+                        local topLeft2D, tlVisible = CurrentCamera:WorldToViewportPoint(hrpPos + (CurrentCamera.CFrame.RightVector * -(boxSize.X / 2)) + (-CurrentCamera.CFrame.UpVector * (boxSize.Y / 2)))
+                        local bottomRight2D, brVisible = CurrentCamera:WorldToViewportPoint(hrpPos + (CurrentCamera.CFrame.RightVector * (boxSize.X / 2)) + (-CurrentCamera.CFrame.UpVector * -(boxSize.Y / 2)))
+                        local bottomLeft2D, blVisible = CurrentCamera:WorldToViewportPoint(hrpPos + (CurrentCamera.CFrame.RightVector * -(boxSize.X / 2)) + (-CurrentCamera.CFrame.UpVector * -(boxSize.Y / 2)))
+
+                        local isVisible = trVisible or tlVisible or brVisible or blVisible
+                        if isVisible then
+                            local tl2D = Vector2.new(topLeft2D.X, topLeft2D.Y)
+                            local tr2D = Vector2.new(topRight2D.X, topRight2D.Y)
+                            local bl2D = Vector2.new(bottomLeft2D.X, bottomLeft2D.Y)
+                            local br2D = Vector2.new(bottomRight2D.X, bottomRight2D.Y)
+                            local boxColor = (ESPData.Settings.TeamColor and Target.Team) and Target.TeamColor.Color or ESPData.Settings.Color
+                            if ESPData.Settings.Boxes then
+                                if ESPData.Settings.BoxMode == "Box" then
+                                    BoxOutline.PointA = tr2D
+                                    BoxOutline.PointB = tl2D
+                                    BoxOutline.PointC = bl2D
+                                    BoxOutline.PointD = br2D
+                                    BoxOutline.Visible = ESPData.Settings.Boxes
+                                    BoxOutline.Color = boxColor
+
+                                    BoxFill.PointA = Vector2.new(tr2D.X - 1, tr2D.Y + 1)
+                                    BoxFill.PointB = Vector2.new(tl2D.X + 1, tl2D.Y + 1)
+                                    BoxFill.PointC = Vector2.new(bl2D.X + 1, bl2D.Y - 1)
+                                    BoxFill.PointD = Vector2.new(br2D.X - 1, br2D.Y - 1)
+                                    BoxFill.Visible = ESPData.Settings.FillBoxes
+                                    BoxFill.Color = ESPData.Settings.FillColor
+
+                                    for _, L in next, SkeletonLines do L.Visible = false end
+                                elseif ESPData.Settings.BoxMode == "Cornered" then
+                                    DrawCorneredBox(tl2D, tr2D, bl2D, br2D, boxColor)
+                                    BoxOutline.Visible = false
+                                    BoxFill.Visible = false
+                                end
+                            else
+                                BoxOutline.Visible = false
                                 for _, L in next, SkeletonLines do L.Visible = false end
                             end
-                        elseif ESPData.Settings.ESPMode == "3D Box" then
-                            local isVisible = false
-                            local boxSize = Vector3.new(4, 6, 4)
-                            local hrpPos = Root.Position - Vector3.new(0, 0.25, 0)
 
-                            local corners = {
-                                hrpPos + Vector3.new(boxSize.X / 2, boxSize.Y / 2, boxSize.X / 2),
-                                hrpPos + Vector3.new(-(boxSize.X / 2), boxSize.Y / 2, boxSize.X / 2),
-                                hrpPos + Vector3.new(-(boxSize.X / 2), boxSize.Y / 2, -(boxSize.X / 2)),
-                                hrpPos + Vector3.new(boxSize.X / 2, boxSize.Y / 2, -(boxSize.X / 2)),
-                                hrpPos + Vector3.new(boxSize.X / 2, -(boxSize.Y / 2), boxSize.X / 2),
-                                hrpPos + Vector3.new(-(boxSize.X / 2), -(boxSize.Y / 2), boxSize.X / 2),
-                                hrpPos + Vector3.new(-(boxSize.X / 2), -(boxSize.Y / 2), -(boxSize.X / 2)),
-                                hrpPos + Vector3.new(boxSize.X / 2, -(boxSize.Y / 2), -(boxSize.X / 2))
-                            }
+                            if ESPData.Settings.Health then
+                                HealthBarOutline.From = Vector2.new(topLeft2D.X - 4, topLeft2D.Y)
+                                HealthBarOutline.To = Vector2.new(topLeft2D.X - 4, bottomLeft2D.Y)
+                                HealthBarOutline.Visible = true
+                                
+                                local HealthPercent = math.clamp(Humanoid.Health / Humanoid.MaxHealth, 0, 1)
+                                HealthBar.From = Vector2.new(topLeft2D.X - 4, topLeft2D.Y)
+                                HealthBar.To = Vector2.new(topLeft2D.X - 4, topLeft2D.Y + (bottomLeft2D.Y - topLeft2D.Y) * HealthPercent)
+                                HealthBar.Color = Color3.fromRGB(255 - (255 * HealthPercent), 255 * HealthPercent, 0)
+                                HealthBar.Visible = true
+                            else
+                                HealthBar.Visible = false
+                                HealthBarOutline.Visible = false
+                            end
+                            if ESPData.Settings.Name then
+                                local namePos = Vector2.new((topLeft2D.X + topRight2D.X) / 2, math.min(topLeft2D.Y, bottomLeft2D.Y, topRight2D.Y, bottomRight2D.Y) - 30)
+                                NameTag.Position = namePos
+                                NameTag.Text = Target.Name
+                                NameTag.Visible = true
+                                NameTag.Color = (ESPData.Settings.TeamColor and Target.Team) and Target.TeamColor.Color or ESPData.Settings.Color
+                            else
+                                NameTag.Visible = false
+                            end
+                        else
+                            BoxOutline.Visible = false
+                            BoxFill.Visible = false
+                            HealthBar.Visible = false
+                            HealthBarOutline.Visible = false
+                            NameTag.Visible = false
+                            for _, L in next, SkeletonLines do L.Visible = false end
+                        end
+                    elseif ESPData.Settings.ESPMode == "Locked" then
+                        local hrpPos = Root.Position - Vector3.new(0, 0.2, 0)
+                        local boxSize = Vector3.new(4.5, 6.5, 0)
 
-                            local screenPos = {}
-                            for i, corner in next, corners do
-                                local pos, vis = CurrentCamera:WorldToViewportPoint(corner)
-                                screenPos[i] = { Pos = pos, Visible = vis }
-                                if vis then isVisible = true end
+                        local topRight2D, trVisible = CurrentCamera:WorldToViewportPoint(hrpPos + (Root.CFrame.RightVector * boxSize.X / 2) + (Root.CFrame.UpVector * boxSize.Y / 2))
+                        local topLeft2D, tlVisible = CurrentCamera:WorldToViewportPoint(hrpPos + (Root.CFrame.RightVector * -(boxSize.X / 2)) + (Root.CFrame.UpVector * boxSize.Y / 2))
+                        local bottomRight2D, brVisible = CurrentCamera:WorldToViewportPoint(hrpPos + (Root.CFrame.RightVector * boxSize.X / 2) + (Root.CFrame.UpVector * -(boxSize.Y / 2)))
+                        local bottomLeft2D, blVisible = CurrentCamera:WorldToViewportPoint(hrpPos + (Root.CFrame.RightVector * -(boxSize.X / 2)) + (Root.CFrame.UpVector * -(boxSize.Y / 2)))
+
+                        if trVisible or tlVisible or brVisible or blVisible then
+                            local tl2D = Vector2.new(topLeft2D.X, topLeft2D.Y)
+                            local tr2D = Vector2.new(topRight2D.X, topRight2D.Y)
+                            local bl2D = Vector2.new(bottomLeft2D.X, bottomLeft2D.Y)
+                            local br2D = Vector2.new(bottomRight2D.X, bottomRight2D.Y)
+                            local BoxColor = (ESPData.Settings.TeamColor and Target.Team) and Target.TeamColor.Color or ESPData.Settings.Color
+
+                            if ESPData.Settings.Boxes then
+                                if ESPData.Settings.BoxMode == "Box" then
+                                    BoxOutline.PointA = tr2D
+                                    BoxOutline.PointB = tl2D
+                                    BoxOutline.PointC = bl2D
+                                    BoxOutline.PointD = br2D
+                                    BoxOutline.Visible = ESPData.Settings.Boxes
+                                    BoxOutline.Color = BoxColor
+
+                                    BoxFill.PointA = Vector2.new(tr2D.X - 1, tr2D.Y + 1)
+                                    BoxFill.PointB = Vector2.new(tl2D.X + 1, tl2D.Y + 1)
+                                    BoxFill.PointC = Vector2.new(bl2D.X + 1, bl2D.Y - 1)
+                                    BoxFill.PointD = Vector2.new(br2D.X - 1, br2D.Y - 1)
+                                    BoxFill.Visible = ESPData.Settings.FillBoxes
+                                    BoxFill.Color = ESPData.Settings.FillColor
+
+                                    for _, L in next, SkeletonLines do L.Visible = false end
+                                elseif ESPData.Settings.BoxMode == "Cornered" then
+                                    local Flip = (tl2D.X > tr2D.X) or (bl2D.X > br2D.X)
+                                    if Flip then
+                                        DrawCorneredBox(br2D, bl2D, tr2D, tl2D, BoxColor)
+                                    else
+                                        DrawCorneredBox(bl2D, br2D, tl2D, tr2D, BoxColor)
+                                    end
+                                    BoxOutline.Visible = false
+                                    BoxFill.Visible = false
+                                end
+                            else
+                                BoxOutline.Visible = false
+                                for _, L in next, SkeletonLines do L.Visible = false end
                             end
 
-                            local edges = {
-                                {1, 2}, {2, 3}, {3, 4}, {4, 1},
-                                {5, 6}, {6, 7}, {7, 8}, {8, 5},
-                                {1, 5}, {2, 6}, {3, 7}, {4, 8}
-                            }
+                            if ESPData.Settings.Name then
+                                local namePos = Vector2.new((topLeft2D.X + topRight2D.X) / 2, math.min(topLeft2D.Y, bottomLeft2D.Y, topRight2D.Y, bottomRight2D.Y) - 30)
+                                NameTag.Position = namePos
+                                NameTag.Text = Target.Name
+                                NameTag.Visible = true
+                                NameTag.Color = (ESPData.Settings.TeamColor and Target.Team) and Target.TeamColor.Color or ESPData.Settings.Color
+                            else
+                                NameTag.Visible = false
+                            end
+                        else
+                            BoxOutline.Visible = false
+                            BoxFill.Visible = false
+                            HealthBar.Visible = false
+                            HealthBarOutline.Visible = false
+                            NameTag.Visible = false
+                            for _, L in next, SkeletonLines do L.Visible = false end
+                        end
+                    elseif ESPData.Settings.ESPMode == "Skeleton" then
+                        local screenCoords = {}
+                        local isVisible = false
+                        local isR6 = Humanoid.RigType == Enum.HumanoidRigType.R6
+                        for i, pair in next, DrawPairs do
+                            local Line = SkeletonLines[i]
+                            local Part1, Part2
+                            if isR6 then
+                                Part1 = Target.Character:FindFirstChild(pair[3])
+                                Part2 = Target.Character:FindFirstChild(pair[4])
+                            else
+                                Part1 = Target.Character:FindFirstChild(pair[1])
+                                Part2 = Target.Character:FindFirstChild(pair[2])
+                            end
+                            if Part1 and Part2 then
+                                local pos1 = Part1.Position
+                                local pos2 = Part2.Position
 
-                            for i, edge in next, edges do
-                                local Line = SkeletonLines[i]
-                                local p1, p2 = screenPos[edge[1]], screenPos[edge[2]]
-                                if p1.Visible and p2.Visible then
-                                    Line.From = Vector2.new(p1.Pos.X, p1.Pos.Y)
-                                    Line.To = Vector2.new(p2.Pos.X, p2.Pos.Y)
+                                if isR6 and pair[5] then
+                                    pos1 = (Part1.CFrame * pair[5]).p
+                                elseif not isR6 and pair[1] == "Head" then
+                                    pos1 = (Part1.CFrame * CFrame.new(0, -0.2, 0)).p
+                                end
+
+                                if isR6 and pair[6] then
+                                    pos2 = (Part2.CFrame * pair[6]).p
+                                elseif not isR6 and pair[2] == "UpperTorso" and pair[1] ~= "Head" then
+                                    pos2 = (Part2.CFrame * CFrame.new(0, 0.5, 0)).p
+                                elseif not isR6 and pair[2] == "LowerTorso" then
+                                    pos2 = Part2.Position
+                                end
+
+                                local P1, Vis1 = CurrentCamera:WorldToViewportPoint(pos1)
+                                local P2, Vis2 = CurrentCamera:WorldToViewportPoint(pos2)
+                                screenCoords[pair[1]] = screenCoords[pair[1]] or { Pos = P1, Visible = Vis1 }
+                                screenCoords[pair[2]] = screenCoords[pair[2]] or { Pos = P2, Visible = Vis2 }
+
+                                if Vis1 and Vis2 then
+                                    Line.From = Vector2.new(P1.X, P1.Y)
+                                    Line.To = Vector2.new(P2.X, P2.Y)
                                     Line.Color = (ESPData.Settings.TeamColor and Target.Team) and Target.TeamColor.Color or ESPData.Settings.Color
                                     Line.Visible = true
+                                    isVisible = true
                                 else
                                     Line.Visible = false
                                 end
-                            end
-
-                            for i = #edges + 1, #SkeletonLines do
-                                SkeletonLines[i].Visible = false
-                            end
-
-                            NameTag.Visible = false
-                            HealthBar.Visible = false
-                            HealthBarOutline.Visible = false
-                            BoxOutline.Visible = false
-                            BoxFill.Visible = false
-
-                            if not isVisible or not ESPData.Settings.Boxes then
-                                for _, L in next, SkeletonLines do L.Visible = false end
+                            else
+                                Line.Visible = false
                             end
                         end
-                    else
-                        BoxOutline.Visible = false
-                        BoxFill.Visible = false
+
                         HealthBar.Visible = false
                         HealthBarOutline.Visible = false
+
+                        if ESPData.Settings.Name and screenCoords.Head and screenCoords.Head.Visible then
+                            local namePos = Vector2.new(screenCoords.Head.Pos.X, screenCoords.Head.Pos.Y - 30)
+                            NameTag.Position = namePos
+                            NameTag.Text = Target.Name
+                            NameTag.Visible = true
+                            NameTag.Color = (ESPData.Settings.TeamColor and Target.Team) and Target.TeamColor.Color or ESPData.Settings.Color
+                        else
+                            NameTag.Visible = false
+                        end
+
+                        BoxOutline.Visible = false
+                        BoxFill.Visible = false
+                        if not isVisible then
+                            NameTag.Visible = false
+                            for _, L in next, SkeletonLines do L.Visible = false end
+                        end
+                    elseif ESPData.Settings.ESPMode == "3D Box" then
+                        local isVisible = false
+                        local boxSize = Vector3.new(4, 6, 4)
+                        local hrpPos = Root.Position - Vector3.new(0, 0.25, 0)
+
+                        local corners = {
+                            hrpPos + Vector3.new(boxSize.X / 2, boxSize.Y / 2, boxSize.X / 2),
+                            hrpPos + Vector3.new(-(boxSize.X / 2), boxSize.Y / 2, boxSize.X / 2),
+                            hrpPos + Vector3.new(-(boxSize.X / 2), boxSize.Y / 2, -(boxSize.X / 2)),
+                            hrpPos + Vector3.new(boxSize.X / 2, boxSize.Y / 2, -(boxSize.X / 2)),
+                            hrpPos + Vector3.new(boxSize.X / 2, -(boxSize.Y / 2), boxSize.X / 2),
+                            hrpPos + Vector3.new(-(boxSize.X / 2), -(boxSize.Y / 2), boxSize.X / 2),
+                            hrpPos + Vector3.new(-(boxSize.X / 2), -(boxSize.Y / 2), -(boxSize.X / 2)),
+                            hrpPos + Vector3.new(boxSize.X / 2, -(boxSize.Y / 2), -(boxSize.X / 2))
+                        }
+
+                        local screenPos = {}
+                        for i, corner in next, corners do
+                            local pos, vis = CurrentCamera:WorldToViewportPoint(corner)
+                            screenPos[i] = { Pos = pos, Visible = vis }
+                            if vis then isVisible = true end
+                        end
+
+                        local edges = {
+                            {1, 2}, {2, 3}, {3, 4}, {4, 1},
+                            {5, 6}, {6, 7}, {7, 8}, {8, 5},
+                            {1, 5}, {2, 6}, {3, 7}, {4, 8}
+                        }
+
+                        for i, edge in next, edges do
+                            local Line = SkeletonLines[i]
+                            local p1, p2 = screenPos[edge[1]], screenPos[edge[2]]
+                            if p1.Visible and p2.Visible then
+                                Line.From = Vector2.new(p1.Pos.X, p1.Pos.Y)
+                                Line.To = Vector2.new(p2.Pos.X, p2.Pos.Y)
+                                Line.Color = (ESPData.Settings.TeamColor and Target.Team) and Target.TeamColor.Color or ESPData.Settings.Color
+                                Line.Visible = true
+                            else
+                                Line.Visible = false
+                            end
+                        end
+
+                        for i = #edges + 1, #SkeletonLines do
+                            SkeletonLines[i].Visible = false
+                        end
+
                         NameTag.Visible = false
-                        for _, L in next, SkeletonLines do L.Visible = false end
+                        HealthBar.Visible = false
+                        HealthBarOutline.Visible = false
+                        BoxOutline.Visible = false
+                        BoxFill.Visible = false
+
+                        if not isVisible or not ESPData.Settings.Boxes then
+                            for _, L in next, SkeletonLines do L.Visible = false end
+                        end
                     end
-                else
-                    BoxOutline.Visible = false
-                    BoxFill.Visible = false
-                    HealthBar.Visible = false
-                    HealthBarOutline.Visible = false
-                    NameTag.Visible = false
-                    for _, L in next, SkeletonLines do L.Visible = false end
                 end
             else
                 BoxOutline.Visible = false
@@ -1317,7 +1296,7 @@ end)();
             end
         end
 
-        ESP:Connection(RunService.RenderStepped:Connect(Update))
+        ESP:Connection(RunService.PreSimulation:Connect(Update))
         ESPData.Data.Instances[Target] = {
             BoxOutline = BoxOutline,
             BoxFill = BoxFill,
@@ -1344,7 +1323,8 @@ end)();
 
             ESPData.Data.Instances[player] = nil
         end
-        ESPData.Data.Instances = {}
+        
+        table.clear(ESPData.Data.Instances)
     end
  
     ESP = Tabs.Render:CreateModule({
@@ -1485,18 +1465,21 @@ end)();
         Flag = "UniversalSpinBot",
         CallingFunction = function(self, enabled: boolean)
             if enabled then
-                if SpinBotData.Settings.Mode == "CFrame" then
-                    self:Connection(RunService.RenderStepped:Connect(function()
-                        LocalPlayer.Character.PrimaryPart.CFrame *= CFrame.Angles(0, math.rad(SpinBotData.Settings.Speed / 5), 0)
-                    end))
-                elseif SpinBotData.Settings.Mode == "Angular" then
-                    SpinBotData.Data.Body = Instance.new("BodyAngularVelocity", LocalPlayer.Character.PrimaryPart)
-                    SpinBotData.Data.Body.AngularVelocity = Vector3.new(0, SpinBotData.Settings.Speed, 0)
-                    SpinBotData.Data.Body.MaxTorque = Vector3.new(0, math.huge, 0)
-                    SpinBotData.Data.Body.P = 10000
-                    self:Connection(RunService.RenderStepped:Connect(function()
+                if Night:IsAlive(LocalPlayer) then
+                    local PrimaryPart: BasePart = LocalPlayer.Character.PrimaryPart or LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                    if SpinBotData.Settings.Mode == "CFrame" then
+                        self:Connection(RunService.RenderStepped:Connect(function()
+                            PrimaryPart.CFrame *= CFrame.Angles(0, math.rad(SpinBotData.Settings.Speed / 5), 0)
+                        end))
+                    elseif SpinBotData.Settings.Mode == "Angular" then
+                        SpinBotData.Data.Body = Instance.new("BodyAngularVelocity", PrimaryPart)
                         SpinBotData.Data.Body.AngularVelocity = Vector3.new(0, SpinBotData.Settings.Speed, 0)
-                    end))
+                        SpinBotData.Data.Body.MaxTorque = Vector3.new(0, math.huge, 0)
+                        SpinBotData.Data.Body.P = 10000
+                        self:Connection(RunService.RenderStepped:Connect(function()
+                            SpinBotData.Data.Body.AngularVelocity = Vector3.new(0, SpinBotData.Settings.Speed, 0)
+                        end))
+                    end
                 end
             else
                 if SpinBotData.Data.Body then
@@ -1546,19 +1529,20 @@ end)();
 
     local Modes = {
         CFrame = function(target: CFrame)
-            LocalPlayer.Character.PrimaryPart.CFrame = target
+            (LocalPlayer.Character.PrimaryPart or LocalPlayer.Character:FindFirstChild("HumanoidRootPart")).CFrame = target
         end,
         Lerp = function(target: CFrame)
-            local Start = LocalPlayer.Character.PrimaryPart.CFrame
-            local Alpha = 0
+            local PrimaryPart: BasePart = LocalPlayer.Character.PrimaryPart or LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            local Start: CFrame = PrimaryPart.CFrame
+            local Alpha: number = 0
             while Alpha < 1 do
                 Alpha += RunService.PreSimulation:Wait() * MouseTPData.Settings.LerpSpeed
-                LocalPlayer.Character.PrimaryPart.CFrame = Start:Lerp(target, math.clamp(Alpha, 0, 1))
+                PrimaryPart.CFrame = Start:Lerp(target, math.clamp(Alpha, 0, 1))
             end
         end,
         Tween = function(target: CFrame)
             local Tween = TweenService:Create(
-                LocalPlayer.Character.PrimaryPart,
+                (LocalPlayer.Character.PrimaryPart or LocalPlayer.Character:FindFirstChild("HumanoidRootPart")),
                 TweenInfo.new(1 - MouseTPData.Settings.TweenSpeed / 10, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
                 {CFrame = target}
             )
@@ -1633,7 +1617,7 @@ end)();
             if enabled then
                 repeat
                     if Night:IsAlive(LocalPlayer) then
-                        local Root: BasePart = LocalPlayer.Character.PrimaryPart
+                        local Root: BasePart = LocalPlayer.Character.PrimaryPart or LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
                         local Humanoid: Humanoid = LocalPlayer.Character.Humanoid
 
                         local FilterDescendants = {}
@@ -1697,7 +1681,7 @@ end)();
     Param.FilterType = Enum.RaycastFilterType.Exclude
 
     local function Teleport(Character: Model, Direction: Vector3)
-        local Torso = Character.PrimaryPart
+        local Torso: BasePart = Character.PrimaryPart or Character:FindFirstChild("HumanoidRootPart")
         if not Torso then
             Torso = Character:FindFirstChild("Torso") or Character:FindFirstChild("UpperTorso")
         end
@@ -1751,7 +1735,7 @@ end)();
                         end
                         Param.FilterDescendantsInstances = Filter
 
-                        local Ray: RaycastResult? = workspace:Raycast(Character.PrimaryPart.Position, Humanoid.MoveDirection * NoClipData.Settings.Distance, Param)
+                        local Ray: RaycastResult? = workspace:Raycast((Character.PrimaryPart or Character:FindFirstChild("HumanoidRootPart")).Position, Humanoid.MoveDirection * NoClipData.Settings.Distance, Param)
                         if Ray then
                             Teleport(Character, Humanoid.MoveDirection)
                         end
@@ -1958,14 +1942,14 @@ end)();
             if enabled then
                 if Mode == "Button" then
                     if Night:IsAlive(LocalPlayer) then
-                        local Root: BasePart = LocalPlayer.Character.PrimaryPart
+                        local Root: BasePart = LocalPlayer.Character.PrimaryPart or LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
                         local CurrentVelocity: Vector3 = Root.AssemblyLinearVelocity
                         Root.AssemblyLinearVelocity = Vector3.new(CurrentVelocity.X, Power, CurrentVelocity.Z)
                     end
                 else
                     self:Connection(UserInputService.JumpRequest:Connect(function()
                         if Night:IsAlive(LocalPlayer) then
-                            local Root: BasePart = LocalPlayer.Character.PrimaryPart
+                            local Root: BasePart = LocalPlayer.Character.PrimaryPart or LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
                             local CurrentVelocity: Vector3 = Root.AssemblyLinearVelocity
                             Root.AssemblyLinearVelocity = Vector3.new(CurrentVelocity.X, Power, CurrentVelocity.Z)
                         end
@@ -2200,7 +2184,7 @@ end)();
 
     local function MakeTrail()
         if Night:IsAlive(LocalPlayer) then
-            local PrimaryPart: BasePart = LocalPlayer.Character.PrimaryPart
+            local PrimaryPart: BasePart = LocalPlayer.Character.PrimaryPart or LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
             local Att0: Attachment = Instance.new("Attachment", PrimaryPart)
             Att0.Position = Vector3.new(-(TrailsData.Settings.Width / 6), -2.55, 0)
 
@@ -2250,7 +2234,7 @@ end)();
         end
 
         if Night:IsAlive(LocalPlayer) and Trails.Enabled then
-            local PrimaryPart: BasePart = LocalPlayer.Character.PrimaryPart
+            local PrimaryPart: BasePart = LocalPlayer.Character.PrimaryPart or LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
             local Humanoid: Humanoid = LocalPlayer.Character.Humanoid
             if TrailsData.Settings.Shape == "Trail" then
                 MakeTrail()
@@ -2970,7 +2954,8 @@ end)();
         ClickType = "Left",
         CPS = 20,
         Range = 30,
-        DistanceCheck = false
+        DistanceCheck = false,
+        TeamCheck = false
     }
 
     local TriggerBot
@@ -2987,6 +2972,13 @@ end)();
                             local PlayerRoot: BasePart? = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
 
                             if TargetRoot and PlayerRoot then
+                                if TriggerBotData.TeamCheck then
+                                    local TargetPlayer: Player? = Players:GetPlayerFromCharacter(Mouse.Target.Parent)
+                                    if TargetPlayer and TargetPlayer.Team == LocalPlayer.Team then
+                                        continue
+                                    end
+                                end
+
                                 local Dist: number = (TargetRoot.Position - PlayerRoot.Position).Magnitude
                                 if TriggerBotData.DistanceCheck and Dist <= TriggerBotData.Range or not TriggerBotData.DistanceCheck then
                                     if TriggerBotData.ClickType == "Left" then
@@ -3030,6 +3022,14 @@ end)();
         Increment = 1,
         CallingFunction = function(self, value: number)
             TriggerBotData.CPS = value
+        end
+    })
+
+    TriggerBot:MiniToggle({
+        Name = "Team Check",
+        Flag = "TriggerBotTeamCheck",
+        CallingFunction = function(self, value: boolean)
+            TriggerBotData.TeamCheck = value
         end
     })
 
