@@ -614,16 +614,7 @@ do
             if Night.Dev and isfile and isfile(Path) and readfile then
                 loadstring(readfile(Path))()
             else
-                if RequestFunc then
-                    local Req = RequestFunc({
-                        Url = "https://raw.githubusercontent.com/null-wtf/NewNight/refs/heads/main/Games/"..Game..".luau",
-                        Method = "GET"
-                    })
-
-                    if Req.Success then
-                        loadstring(Req.Body)()
-                    end
-                end
+                loadstring(game:HttpGet("https://raw.githubusercontent.com/null-wtf/NewNight/refs/heads/main/Games/"..Game..".luau"))()
             end
         end)
 
@@ -639,16 +630,7 @@ do
                 if Night.Dev and isfile and isfile(PremiumPath) and readfile then
                     loadstring(readfile(PremiumPath))()
                 else
-                    if RequestFunc then
-                        local Req = RequestFunc({
-                            Url = "https://raw.githubusercontent.com/null-wtf/NewNight/refs/heads/main/Premium/Games/"..Game..".luau",
-                            Method = "GET"
-                        })
-
-                        if Req.Success then
-                            loadstring(Req.Body)()
-                        end
-                    end
+                    loadstring(game:HttpGet("https://raw.githubusercontent.com/null-wtf/NewNight/refs/heads/main/Premium/Games/"..Game..".luau"))()
                 end
             end)
 
@@ -4327,3 +4309,4 @@ setmetatable(Night.Assets, {
 setmetatable(UIData, {
     __index = UIData.Windows.Windows
 })
+
