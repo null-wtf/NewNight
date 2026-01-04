@@ -508,6 +508,7 @@ local autowin = Windows.Combat:CreateModule({
 	Flag = "",
 	CallingFunction = function(self, enabled: boolean)
 		auto_win_table.Enabled = enabled
+		--mousemoveabs(100,100)
 	end,
 })
 
