@@ -37,7 +37,7 @@ local Terrain: Terrain = workspace:FindFirstChildOfClass("Terrain")
 local MainRequest = http and http.request or request
 
 local Materials = {}
-for _, Material in next, Enum.Material:GetEnumItems() do
+for _, Material: Enum.Material in next, Enum.Material:GetEnumItems() do
     table.insert(Materials, Material.Name)
 end
 
@@ -1727,7 +1727,7 @@ end)();
                     end
 
                     if NoClipData.Settings.Mode == "Teleport" or NoClipData.Settings.Mode == "Slide" then
-                        local Filter: {Instance} = {}
+                        local Filter: {Instance} = {CurrentCamera}
                         for _, Player in next, Players:GetPlayers() do
                             if Player.Character then
                                 table.insert(Filter, Player.Character)
@@ -3634,6 +3634,85 @@ end)();
         Increment = 0.01,
         CallingFunction = function(self, value: number)
             FakeLagData.BurstSpeedMax = value
+        end
+    })
+end)();
+
+(function()
+    local Gravity: number = 192
+    local OldGravity: number?
+    local Module = Tabs.Movement:CreateModule({
+        Name = "Gravity",
+        Flag = "Gravity",
+        CallingFunction = function(self, value: boolean)
+            if value then
+                OldGravity = workspace.Gravity
+                workspace.Gravity = Gravity
+                self:Connection(workspace:GetPropertyChangedSignal("Gravity"):Connect(function()
+                    workspace.Gravity = Gravity
+                end))
+            else
+                if OldGravity then
+                    workspace.Gravity = OldGravity
+                    OldGravity = nil
+                end
+            end
+        end
+    })
+    
+    Module:Slider({
+        Name = "Gravity",
+        Flag = "GravityValue",
+        Min = 0,
+        Max = 192,
+        Default = 192,
+        CallingFunction = function(self, value: number)
+            Gravity = value
+            if Module.Enabled then
+                workspace.Gravity = value
+            end
+        end
+    })
+end)();
+
+(function()
+    local RaycastParams: RaycastParams = RaycastParams.new()
+    RaycastParams.FilterType = Enum.RaycastFilterType.Exclude
+
+    Tabs.Utility:CreateModule({
+        Name = "Safe Walk",
+        Flag = "SafeWalk",
+        CallingFunction = function(self, value: boolean)
+            if value then
+                repeat
+                    local Fly = Tabs.Movement.Modules.Fly or Tabs.Movement.Modules.UniversalFly
+                    if Night:IsAlive(LocalPlayer) then
+                        local PrimaryPart: BasePart = LocalPlayer.Character.PrimaryPart or LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                        local Humanoid: Humanoid = LocalPlayer.Character.Humanoid
+                        if (Fly and not Fly.Enabled or not Fly) then
+                            local Filter: {Instance} = {CurrentCamera}
+                            for i,v in Players:GetPlayers() do
+                                if v.Character then
+                                    table.insert(Filter, v.Character)
+                                end
+                            end
+
+                            RaycastParams.FilterDescendantsInstances = Filter
+                            local InfrontOfPlayer: Vector3 = (Humanoid.MoveDirection * 20)
+                            local Direction: Vector3 = Vector3.new(InfrontOfPlayer.X, -1000, InfrontOfPlayer.Z)
+                            local Raycast: RaycastResult = workspace:Raycast(PrimaryPart.Position, Direction, RaycastParams)
+                            PrimaryPart.Anchored = (not Raycast or not Raycast.Instance)
+                        else
+                            PrimaryPart.Anchored = false
+                        end
+                    end
+                    task.wait()
+                until not self.Enabled
+            else
+                if Night:IsAlive(LocalPlayer) then
+                    (LocalPlayer.Character.PrimaryPart or LocalPlayer.Character:FindFirstChild("HumanoidRootPart")).Anchored = false
+                end
+            end
         end
     })
 end)();
