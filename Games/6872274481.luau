@@ -839,6 +839,50 @@ local function DamageBlock(Block: Instance, Hit: Enum.NormalId)
     return
 end
 
+local function Aim(Start: Vector3, LaunchVel: number, Gravity: number?, TargetPos: Vector3, TargetVel: Vector3, HipHeight: number?): Vector3?
+    if not (Start and TargetPos and LaunchVel > 1) then return end
+
+    Gravity = Gravity or workspace.Gravity
+    HipHeight = HipHeight or 0
+    TargetPos = TargetPos + Vector3.new(0, HipHeight, 0)
+
+    local Dist = TargetPos - Start
+    local Vec = Vector3.new(Dist.X, 0, Dist.Z)
+    local Mag = Vec.Magnitude
+    local Time = Mag / LaunchVel
+
+    local LastTime = 0
+    local Iter = 0
+
+    while math.abs(Time - LastTime) > 0.001 and Iter < 8 do
+        Iter += 1
+        LastTime = Time
+
+        local DampFactor = math.clamp(0.4 + (100 / LaunchVel) * 0.1, 0.35, 0.55)
+        local Velocity = Vector3.new(TargetVel.X, TargetVel.Y * DampFactor, TargetVel.Z)
+
+        local Prediction = TargetPos + Velocity * Time
+        local Dist2 = Prediction - Start
+        local Horiz = Vector3.new(Dist2.X, 0, Dist2.Z)
+        local HorizMag = Horiz.Magnitude
+
+        local TimeNew = HorizMag / LaunchVel
+        TimeNew = TimeNew + math.abs((Dist2.Y + 0.5 * Gravity * Time^2) / LaunchVel)
+
+        Time = (Time + TimeNew) * 0.5
+    end
+
+    Time += ((Stats and Stats.Ping:GetValue() / 1000) or 0.1)
+
+    local Factor = math.clamp(0.42 + (100 / LaunchVel) * 0.1, 0.38, 0.5)
+    local FinalPrediction = TargetPos + Vector3.new(TargetVel.X, TargetVel.Y * Factor, TargetVel.Z) * Time
+
+    local DropFactor = math.clamp(0.22 + (80 / LaunchVel) * 0.06 + (Mag / 2000), 0.25, 0.38)
+    FinalPrediction -= Vector3.new(0, (DropFactor * Gravity * Time * Time) - 2.2, 0)
+
+    return FinalPrediction
+end
+
 Windows.Movement.Modules.UniversalSpeed:Destroy()
 Windows.Movement.Modules.UniversalFly:Destroy()
 Windows.Combat.Modules.UniversalAimbot:Destroy()
@@ -1097,9 +1141,9 @@ end)();
         CallingFunction = function(self, enabled: boolean)
             if enabled then
                 if Night.Mobile then
-                    local TouchGui = PlayerGui:FindFirstChild("TouchGui")
-                    local TouchControl = TouchGui and TouchGui:FindFirstChild("TouchControlFrame")
-                    local JumpButton = TouchControl and TouchControl:FindFirstChild("JumpButton")
+                    local TouchGui: ScreenGui = PlayerGui:FindFirstChild("TouchGui")
+                    local TouchControl: Frame = TouchGui and TouchGui:FindFirstChild("TouchControlFrame")
+                    local JumpButton: ImageButton = TouchControl and TouchControl:FindFirstChild("JumpButton")
                     if JumpButton then
                         self:Connection(JumpButton:GetPropertyChangedSignal("ImageRectOffset"):Connect(function()
                             FlyData.Settings.VerticalValue = JumpButton.ImageRectOffset.X == 146 and 1 or 0
@@ -3305,50 +3349,6 @@ end)();
                 GameData.Utils.Sound:playSound(Sounds[1])
             end
         end
-    end
-
-    local function Aim(Start: Vector3, LaunchVel: number, Gravity: number?, TargetPos: Vector3, TargetVel: Vector3, HipHeight: number?): Vector3?
-        if not (Start and TargetPos and LaunchVel > 1) then return end
-
-        Gravity = Gravity or workspace.Gravity
-        HipHeight = HipHeight or 0
-        TargetPos = TargetPos + Vector3.new(0, HipHeight, 0)
-
-        local Dist = TargetPos - Start
-        local Vec = Vector3.new(Dist.X, 0, Dist.Z)
-        local Mag = Vec.Magnitude
-        local Time = Mag / LaunchVel
-
-        local LastTime = 0
-        local Iter = 0
-
-        while math.abs(Time - LastTime) > 0.001 and Iter < 8 do
-            Iter += 1
-            LastTime = Time
-
-            local DampFactor = math.clamp(0.4 + (100 / LaunchVel) * 0.1, 0.35, 0.55)
-            local Velocity = Vector3.new(TargetVel.X, TargetVel.Y * DampFactor, TargetVel.Z)
-
-            local Prediction = TargetPos + Velocity * Time
-            local Dist2 = Prediction - Start
-            local Horiz = Vector3.new(Dist2.X, 0, Dist2.Z)
-            local HorizMag = Horiz.Magnitude
-
-            local TimeNew = HorizMag / LaunchVel
-            TimeNew = TimeNew + math.abs((Dist2.Y + 0.5 * Gravity * Time^2) / LaunchVel)
-
-            Time = (Time + TimeNew) * 0.5
-        end
-
-        Time += ((Stats and Stats.Ping:GetValue() / 1000) or 0.1)
-
-        local Factor = math.clamp(0.42 + (100 / LaunchVel) * 0.1, 0.38, 0.5)
-        local FinalPrediction = TargetPos + Vector3.new(TargetVel.X, TargetVel.Y * Factor, TargetVel.Z) * Time
-
-        local DropFactor = math.clamp(0.22 + (80 / LaunchVel) * 0.06 + (Mag / 2000), 0.25, 0.38)
-        FinalPrediction -= Vector3.new(0, (DropFactor * Gravity * Time * Time) - 2.2, 0)
-
-        return FinalPrediction
     end
 
     local ProjAura = Windows.Combat:CreateModule({
@@ -5938,6 +5938,7 @@ end)();
 end)();
 
 (function()
+    -- pls stop skidding ts :rage:
     Windows.Utility:CreateModule({
         Name = "Match History",
         Flag = "MatchHistroy",
@@ -5997,6 +5998,7 @@ end)();
                             continue
                         end
 
+                        -- no im not cleaning this
                         for i = 1, 2 do
                             local Block = GetBlocks()
                             local Pos: Vector3 = Bed.Bed.Position + (Vector3.fromNormalId(v) * (3 * i))
@@ -6022,3 +6024,45 @@ end)();
         end
     })
 end)();
+
+(function()
+    Windows.Utility:CreateModule({
+        Name = "MouseTP",
+        Flag = "MouseTP",
+        Button = true,
+        CallingFunction = function(self, enabled: boolean)
+            if enabled then
+                if Night:IsAlive(LocalPlayer) then 
+                    local Mouse: Mouse? = LocalPlayer:GetMouse()
+                    if Mouse then
+                        local Pearl = GetItem("telepearl")
+                        if Pearl then
+                            local PlayerPosition: BasePart = LocalPlayer.Character.PrimaryPart.Position
+                            local MousePos: Vector3 = Mouse.Hit.Position
+                            MousePos = Vector3.new(MousePos.X, MousePos.Y, MousePos.Z)
+                            local LaunchVel: number = GameData.Utils.ProjMeta.telepearl.launchVelocity
+                            local LookCF: CFrame = CFrame.new(PlayerPosition, MousePos)
+                            local LookVec: Vector3 = LookCF.LookVector * LaunchVel
+
+                            SwitchItem(Pearl.tool)
+                            GameData.Utils.Remotes:Get("ProjectileFire"):CallServerAsync(
+                                Pearl.tool, "telepearl", "telepearl",
+                                LookCF.Position,
+                                PlayerPosition, LookVec,
+                                HttpService:GenerateGUID(true),
+                                {drawDurationSec = math.random(1,3), shotId = HttpService:GenerateGUID(false)},
+                                workspace:GetServerTimeNow()
+                            )
+                        else
+                            Warning("Mouse Teleport", "You must have a pearl.", 5)
+                        end
+                    else
+                        Warning("Mouse Teleport", "Unable to find mouse.", 5)
+                    end
+                else
+                    Warning("Mouse Teleport", "You are dead.", 5)
+                end
+            end
+        end
+    })
+end)()
