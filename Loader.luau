@@ -20,7 +20,7 @@ local Camera: Camera = workspace.CurrentCamera
 local BaseGit: string = "https://github.com/null-wtf/NewNight"
 local NightInit: {[any]: any} = getgenv().NightInit or {}
 local Night = {
-    Version = "3.08",
+    Version = "3.07",
     BaseGit = BaseGit,
     Scale = 0.9,
     Keybind = Enum.KeyCode.RightShift,
@@ -31,6 +31,7 @@ local Night = {
     CurrentConfig = {},
     IgnoreConfigs = {"8560631822", "8444591321"},
     OnUninject = Instance.new("BindableEvent"),
+    FailedToLoad = false,
     Load = {
         Start = os.clock(),
         Time = 0,
@@ -61,12 +62,12 @@ for i,v: string in Night.Directories do
 end
 
 for i,v in NightInit do
+    print(i,v)
     Night[i] = v
 end
 
 if UserInputService.TouchEnabled and not UserInputService.MouseEnabled then
     Night.Mobile = true
-
     if Camera then
         if 0.4 >= (Camera.ViewportSize.X / 1000) - 0.1 then
             Night.Scale = 0.4
@@ -163,10 +164,15 @@ if queue_on_teleport then
             local Data = string.format("getgenv().NightInit = {")
             local Wrote = false
             for i,v in Night.Init do
+				local Item: string = tostring(i).." = "..tostring(v)
+				if typeof(v) == "string" then
+					Item = tostring(i).." = '"..tostring(v) .. "'"
+				end
+
                 if Wrote then
-                    Data = Data..", "..tostring(i).." = "..tostring(v)
+                    Data = Data..", "..Item
                 else
-                    Data = Data..tostring(i).." = "..tostring(v)
+                    Data = Data..Item
                 end
 
                 Wrote = true
@@ -220,4 +226,3 @@ Night:CreateNotification({
     Description = Night.Load.LoadTips[math.random(1, #Night.Load.LoadTips)],
     Duration = 3
 })
-
