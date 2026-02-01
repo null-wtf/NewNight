@@ -62,7 +62,6 @@ for i,v: string in Night.Directories do
 end
 
 for i,v in NightInit do
-    print(i,v)
     Night[i] = v
 end
 
