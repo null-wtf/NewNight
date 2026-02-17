@@ -2084,7 +2084,7 @@ local function CreateWindow(Data: {Name: string, Flag: string, Size: UDim2, Posi
                     coroutine.wrap(function()
                         if Toggled then
                             TweenService:Create(MainMiniToggleFrame, TweenInfo.new(0.15), {BackgroundColor3 = UIData.Theme.Other}):Play()
-                            TweenService:Create(MiniToggleCircle, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(96, 168, 255), Position = UDim2.fromScale(0.61, 0.25)}):Play()
+                            TweenService:Create(MiniToggleCircle, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(255, 255, 255), Position = UDim2.fromScale(0.61, 0.25)}):Play()
                         else
                             TweenService:Create(MiniToggleCircle, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(48, 56, 80), Position = UDim2.fromScale(0.125, 0.25)}):Play()
                             TweenService:Create(MainMiniToggleFrame, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(14, 16, 23)}):Play()
