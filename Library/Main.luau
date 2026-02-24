@@ -4050,10 +4050,15 @@ UISettingsWindow:CreateModule({
             local Data = string.format("getgenv().NightInit = {")
             local Wrote = false
             for i,v in Night.Init do
+				local Item: string = tostring(i).." = "..tostring(v)
+				if typeof(v) == "string" then
+					Item = tostring(i).." = '"..tostring(v) .. "'"
+				end
+
                 if Wrote then
-                    Data = Data..", "..tostring(i).." = "..tostring(v)
+                    Data = Data..", "..Item
                 else
-                    Data = Data..tostring(i).." = "..tostring(v)
+                    Data = Data..Item
                 end
 
                 Wrote = true
