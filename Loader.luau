@@ -137,7 +137,7 @@ end
 
 DownloadDirectory("/tree/main/Assets", "Assets")
 writefile("NewNight/Assets/UpdatedIcons.txt", "")
-if Night.Dev then
+if Night.Dev and isfile("NewNight/Library/Main.luau") then
     loadstring(readfile("NewNight/Library/Main.luau"))()
 else
     loadstring(game:HttpGet("https://raw.githubusercontent.com/null-wtf/NewNight/refs/heads/main/Library/Main.luau"))()
