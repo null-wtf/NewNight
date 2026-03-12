@@ -2505,7 +2505,6 @@ local function CreateWindow(Data: {Name: string, Flag: string, Size: UDim2, Posi
                         RealColorSliderData.LastClicked = os.clock()
                         RealColorSliderData.Functions:Rainbow()
 
-                        print("rainbow")
                         Night.CurrentConfig.ColorSliders[RealColorSliderData.Data.Flag] = "Rainbow"
                         Assets.Config:Save(Night.CurrentConfig, tostring(Night.Game).."/"..tostring(Night.CurrentConfig.ConfigName), {tostring(Night.Game)})
                         return
