@@ -610,19 +610,13 @@ do
             LoadConfig = true
         end
 
-        local suc, err = pcall(function()
+        local suc: boolean, err: string? = pcall(function()
             if Night.Dev and isfile and isfile(Path) and readfile then
                 loadstring(readfile(Path))()
             else
-                if RequestFunc then
-                    local Req = RequestFunc({
-                        Url = "https://raw.githubusercontent.com/null-wtf/NewNight/refs/heads/main/Games/"..Game..".luau",
-                        Method = "GET"
-                    })
-
-                    if Req.Success then
-                        loadstring(Req.Body)()
-                    end
+                local Success: boolean, Req: string? = pcall(game.HttpGet, "https://raw.githubusercontent.com/null-wtf/NewNight/refs/heads/main/Games/"..Game..".luau")
+                if Success and typeof(Req) == "string" and Req ~= "404: Not Found" then
+                    loadstring(Req)()
                 end
             end
         end)
@@ -635,19 +629,13 @@ do
         end
 
         if Night.Premium and Game ~= "Universal" then
-            local suc2, err2 = pcall(function()
+            local suc2: boolean, err2: string? = pcall(function()
                 if Night.Dev and isfile and isfile(PremiumPath) and readfile then
                     loadstring(readfile(PremiumPath))()
                 else
-                    if RequestFunc then
-                        local Req = RequestFunc({
-                            Url = "https://raw.githubusercontent.com/null-wtf/NewNight/refs/heads/main/Premium/Games/"..Game..".luau",
-                            Method = "GET"
-                        })
-
-                        if Req.Success then
-                            loadstring(Req.Body)()
-                        end
+                    local Success: boolean, Req: string? = pcall(game.HttpGet, "https://raw.githubusercontent.com/null-wtf/NewNight/refs/heads/main/Premium/Games/"..Game..".luau")
+                    if Success and typeof(Req) == "string" and Req ~= "404: Not Found" then
+                        loadstring(Req)()
                     end
                 end
             end)
@@ -2505,6 +2493,7 @@ local function CreateWindow(Data: {Name: string, Flag: string, Size: UDim2, Posi
                         RealColorSliderData.LastClicked = os.clock()
                         RealColorSliderData.Functions:Rainbow()
 
+                        print("rainbow")
                         Night.CurrentConfig.ColorSliders[RealColorSliderData.Data.Flag] = "Rainbow"
                         Assets.Config:Save(Night.CurrentConfig, tostring(Night.Game).."/"..tostring(Night.CurrentConfig.ConfigName), {tostring(Night.Game)})
                         return
