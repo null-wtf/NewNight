@@ -80,7 +80,7 @@ end
 
 local function DownloadAsset(DownloadPath: string, Path: string): boolean
     if writefile then
-        local Suc: boolean, Resp: string = pcall(game.HttpGet, game, BaseGit..DownloadPath)
+        local Suc: boolean, Resp: string = pcall(game.HttpGet, game, DownloadPath)
         if Suc and Resp then
             return pcall(writefile, Path, Resp)
         end
@@ -90,52 +90,42 @@ local function DownloadAsset(DownloadPath: string, Path: string): boolean
 end
 
 local function DownloadDirectory(DirectoryLink: string, SavePath: string): boolean
-	if writefile and makefolder and http and http.request then
+    if writefile and makefolder and http and http.request then
+        if not isfolder(SavePath) then
+            makefolder(SavePath)
+        end
+
         local Suc: boolean, DirData = pcall(http.request, {
-            Url = BaseGit..DirectoryLink,
-            Method = "GET",
-            Headers = {
-                Accept = "application/json"
-            }
+            Url = DirectoryLink,
+            Method = "GET"
         })
 
-        if Suc and DirData then
-            local Body: string? = DirData.Body
+        if Suc and DirData and typeof(DirData) == "table" then
+            local Body = DirData.Body
             if (DirData.Success or DirData.StatusCode == 200) and Body then
-                local SucFormat: boolean, JSON: {[any]: any} = pcall(HttpService.JSONDecode, HttpService, Body)
-                if SucFormat and JSON then
-                    local Payload: {[any]: any} = JSON.payload
-                    if Payload and Payload.tree then
-                        local Items: {[any]: any} = Payload.tree.items
-                        if Items then
-                            for i,v in Items do
-                                if v.contentType == "directory" then
-                                    if makefolder then
-                                        if (isfolder and not isfolder("NewNight/"..SavePath.."/"..v.name)) or not isfolder then
-                                            pcall(makefolder, "NewNight/"..SavePath.."/"..v.name)
-                                        end
-
-                                        DownloadDirectory(DirectoryLink.."/"..v.name, SavePath.."/"..v.name)
-                                    end
-                                else
-                                    if (isfile and (not isfile("NewNight/"..SavePath.."/"..v.name) or not isfile("NewNight/Assets/UpdatedIcons.txt"))) or not isfile then
-                                        DownloadAsset("/raw/refs/heads/main/"..v.path, "NewNight/"..SavePath.."/"..v.name)
-                                    end
-                                end
+                local SucEncode: boolean, Encoded: {[any]: any} = pcall(HttpService.JSONDecode, HttpService, Body)
+                if SucEncode and typeof(Encoded) == "table" then
+                    for i,v in Encoded do
+                        if v.type == "dir" then
+                            if (isfolder and not isfolder(`{SavePath}/{v.name}`)) or not isfolder then
+                                DownloadDirectory(`{DirectoryLink}/{v.name}`, `{SavePath}/{v.name}`)
                             end
-
-                            return true
+                        elseif v.type == "file" and v.download_url then
+                            if not isfile(`{SavePath}/{v.name}`) then
+                                DownloadAsset(v.download_url, `{SavePath}/{v.name}`)
+                            end
                         end
                     end
+
+                    return true
                 end
             end
         end
     end
-
     return false
 end
 
-DownloadDirectory("/tree/main/Assets", "Assets")
+DownloadDirectory("https://api.github.com/repos/null-wtf/NewNight/contents/Assets", "NewNight/Assets")
 writefile("NewNight/Assets/UpdatedIcons.txt", "")
 if Night.Dev and isfile("NewNight/Library/Main.luau") then
     loadstring(readfile("NewNight/Library/Main.luau"))()
