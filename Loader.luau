@@ -95,14 +95,10 @@ local function DownloadDirectory(DirectoryLink: string, SavePath: string): boole
             makefolder(SavePath)
         end
 
-        local Suc: boolean, DirData = pcall(http.request, {
-            Url = DirectoryLink,
-            Method = "GET"
-        })
-
-        if Suc and DirData and typeof(DirData) == "table" then
-            local Body = DirData.Body
-            if (DirData.Success or DirData.StatusCode == 200) and Body then
+        local Suc: boolean, DirData = pcall(game.HttpGet, DirectoryLink)
+        if Suc and DirData and typeof(DirData) == "string" then
+            local Suc2: boolean,Body = pcall(HttpService.JSONDecode, DirData.Body)
+            if Suc2 and (DirData.Success or DirData.StatusCode == 200) and Body then
                 local SucEncode: boolean, Encoded: {[any]: any} = pcall(HttpService.JSONDecode, HttpService, Body)
                 if SucEncode and typeof(Encoded) == "table" then
                     for i,v in Encoded do
