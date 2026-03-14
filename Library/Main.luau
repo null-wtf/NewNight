@@ -641,6 +641,10 @@ do
             end)
 
             if not suc2 then
+                if setthreadidentity then
+                    pcall(setthreadidentity, 8)
+                end
+            
                 return Assets.Functions:CreateNotification({
                     Title = "Failed to load premium file: "..tostring(Game),
                     Description = "Failed to load premium file: "..tostring(Game)..": "..err2
