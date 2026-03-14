@@ -652,10 +652,10 @@ do
             end
         end
 
-        if LoadConfig and not table.find(Night.IgnoreConfigs, tostring(Game)) then
-            local ConfigPath: string = tostring(Game)
-            if not isfolder("NewNight/Configs/"..ConfigPath) and not table.find(Night.IgnoreConfigs, tostring(Night.Game)) then
-                ConfigPath = tostring(Night.Game)
+        if LoadConfig then
+            local ConfigPath: string = tostring(not table.find(Night.IgnoreConfigs, tostring(Night.Game)) and Night.Game or Game)
+            if not isfolder("NewNight/Configs/"..ConfigPath) and not table.find(Night.IgnoreConfigs, tostring(Game)) then
+                ConfigPath = tostring(Game)
             end
 
             if ConfigPath then
