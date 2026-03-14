@@ -614,7 +614,7 @@ do
             if Night.Dev and isfile and isfile(Path) and readfile then
                 loadstring(readfile(Path))()
             else
-                local Success: boolean, Req: string? = pcall(game.HttpGet, "https://raw.githubusercontent.com/null-wtf/NewNight/refs/heads/main/Games/"..Game..".luau")
+                local Success: boolean, Req: string? = pcall(game.HttpGet, game, "https://raw.githubusercontent.com/null-wtf/NewNight/refs/heads/main/Games/"..Game..".luau")
                 if Success and typeof(Req) == "string" and Req ~= "404: Not Found" then
                     loadstring(Req)()
                 end
@@ -633,7 +633,7 @@ do
                 if Night.Dev and isfile and isfile(PremiumPath) and readfile then
                     loadstring(readfile(PremiumPath))()
                 else
-                    local Success: boolean, Req: string? = pcall(game.HttpGet, "https://raw.githubusercontent.com/null-wtf/NewNight/refs/heads/main/Premium/Games/"..Game..".luau")
+                    local Success: boolean, Req: string? = pcall(game.HttpGet, game, "https://raw.githubusercontent.com/null-wtf/NewNight/refs/heads/main/Premium/Games/"..Game..".luau")
                     if Success and typeof(Req) == "string" and Req ~= "404: Not Found" then
                         loadstring(Req)()
                     end
