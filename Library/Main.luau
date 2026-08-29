@@ -3641,23 +3641,6 @@ function Assets.Functions:CreateTargetHud(Data: {Player: Player?, UserData: {Nam
     return TargetHudData
 end
 
--- hi, we just want to see how popular night is + see if people try to use in other games so we can add more support and get feedback
--- please dont spam
-task.spawn(function()
-    pcall(function()
-        if RequestFunc then
-            RequestFunc({
-                Url = "https://nehfeauefutth2.vercel.app/execution",
-                Method = "GET",
-                Headers = {
-                    username = tostring(LocalPlayer.Name),
-                    placeid = tostring(game.PlaceId)
-                }
-            })
-        end
-    end)
-end)
-
 function Assets.Functions:GetTargetHud(Create: boolean, Data: {Player: Player?, UserData: {Name: string, DisplayName: string, ProfilePic: string?}?, Health: {Current: number, Max: number}?}?)
     local THUD = UIData.TargetHud
     if not THUD and Create then
